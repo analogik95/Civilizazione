@@ -1,0 +1,169 @@
+[
+  {
+    "id": "rome_caesar",
+    "name": "Julius Caesar",
+    "civilization": "Rome",
+    "description": "Rome builds roads to every city it founds and fields legions that build as well as fight.",
+    "agenda": "expansionist",
+    "agenda_text": "Admires civilizations that expand steadily. Dislikes those that stay small.",
+    "unique_units": ["legion"],
+    "start_bias": ["plains", "grassland"],
+    "color_primary": "#6b1f2e",
+    "color_secondary": "#e8d9a0",
+    "flavors": { "military": 0.75, "expansion": 0.85, "science": 0.5, "culture": 0.55, "faith": 0.35, "gold": 0.6, "production": 0.7, "wonder": 0.5, "naval": 0.4, "diplomacy": 0.45 },
+    "modifiers": [
+      { "id": "rome_all_roads", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+        "args": { "yields": { "culture": 1, "gold": 1 } },
+        "description": "All Roads Lead to Rome: +1 Culture and +1 Gold in every city." }
+    ]
+  },
+  {
+    "id": "egypt_hatshepsut",
+    "name": "Hatshepsut",
+    "civilization": "Egypt",
+    "description": "Egypt builds wonders faster and grows fat on its river floodplains.",
+    "agenda": "wonder_builder",
+    "agenda_text": "Competes for wonders and resents anyone who beats her to one.",
+    "start_bias": ["desert", "plains"],
+    "color_primary": "#c9a227",
+    "color_secondary": "#2f4858",
+    "flavors": { "military": 0.35, "expansion": 0.5, "science": 0.5, "culture": 0.7, "faith": 0.6, "gold": 0.7, "production": 0.6, "wonder": 0.9, "naval": 0.5, "diplomacy": 0.6 },
+    "modifiers": [
+      { "id": "egypt_wonder_production", "effect": "ADJUST_PRODUCTION_PERCENT", "scope": "city",
+        "args": { "amount": 20 },
+        "description": "Iteru: +20% Production toward Wonders.",
+        "requirements": [{ "type": "PRODUCTION_KIND_IS", "args": { "kind": ["wonder"] } }] },
+      { "id": "egypt_river_food", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+        "args": { "yields": { "food": 2 } },
+        "description": "+2 Food in cities founded on a river.",
+        "requirements": [{ "type": "CITY_HAS_FRESH_WATER", "args": {} }] }
+    ]
+  },
+  {
+    "id": "greece_perikles",
+    "name": "Perikles",
+    "civilization": "Greece",
+    "description": "Greece turns culture into influence, and influence into allies.",
+    "agenda": "city_state_patron",
+    "agenda_text": "Courts city-states and turns cold toward anyone competing for them.",
+    "unique_units": ["hoplite"],
+    "start_bias": ["grassland", "coast"],
+    "color_primary": "#2f6fa8",
+    "color_secondary": "#f2f2f2",
+    "flavors": { "military": 0.45, "expansion": 0.45, "science": 0.6, "culture": 0.9, "faith": 0.4, "gold": 0.55, "production": 0.5, "wonder": 0.65, "naval": 0.7, "diplomacy": 0.85 },
+    "modifiers": [
+      { "id": "greece_culture_per_suzerain", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+        "args": { "yields": { "culture": 2 } },
+        "description": "Surrounded by Glory: +2 Culture in cities with a Theater Square.",
+        "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "theater_square" } }] },
+      { "id": "greece_influence", "effect": "ADJUST_INFLUENCE_PER_TURN", "scope": "player",
+        "args": { "amount": 2 },
+        "description": "+2 Influence per turn toward Envoys." }
+    ]
+  },
+  {
+    "id": "persia_cyrus",
+    "name": "Cyrus",
+    "civilization": "Persia",
+    "description": "Persia moves armies faster than anyone expects and profits from the roads it builds.",
+    "agenda": "opportunist",
+    "agenda_text": "Respects strength. Strikes at civilizations that look weak.",
+    "start_bias": ["plains", "desert"],
+    "color_primary": "#4a2f6b",
+    "color_secondary": "#e0c060",
+    "flavors": { "military": 0.8, "expansion": 0.7, "science": 0.55, "culture": 0.5, "faith": 0.45, "gold": 0.75, "production": 0.6, "wonder": 0.45, "naval": 0.35, "diplomacy": 0.4 },
+    "modifiers": [
+      { "id": "persia_royal_road", "effect": "ADJUST_UNIT_MOVEMENT", "scope": "unit",
+        "args": { "amount": 1 },
+        "description": "Royal Road: +1 Movement for all land units." },
+      { "id": "persia_trade_gold", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+        "args": { "yields": { "gold": 2 } },
+        "description": "+2 Gold in cities with a Commercial Hub.",
+        "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "commercial_hub" } }] }
+    ]
+  },
+  {
+    "id": "china_wu_zetian",
+    "name": "Wu Zetian",
+    "civilization": "China",
+    "description": "China turns every breakthrough into a bigger one — its Eurekas pay out further than anyone else's.",
+    "agenda": "scholar",
+    "agenda_text": "Values civilizations that lead in science and dismisses those that fall behind.",
+    "start_bias": ["grassland", "plains"],
+    "color_primary": "#0f5132",
+    "color_secondary": "#f6e27a",
+    "flavors": { "military": 0.5, "expansion": 0.6, "science": 0.9, "culture": 0.6, "faith": 0.45, "gold": 0.55, "production": 0.7, "wonder": 0.8, "naval": 0.4, "diplomacy": 0.5 },
+    "modifiers": [
+      { "id": "china_eureka_bonus", "effect": "ADJUST_BOOST_PERCENT", "scope": "player",
+        "args": { "amount": 10 },
+        "description": "Dynastic Cycle: Eurekas and Inspirations grant an extra 10% of the cost." },
+      { "id": "china_wonder_production", "effect": "ADJUST_PRODUCTION_PERCENT", "scope": "city",
+        "args": { "amount": 15 },
+        "description": "+15% Production toward Ancient and Classical wonders.",
+        "requirements": [{ "type": "PRODUCTION_KIND_IS", "args": { "kind": ["wonder"] } }] }
+    ]
+  },
+  {
+    "id": "mali_mansa_musa",
+    "name": "Mansa Musa",
+    "civilization": "Mali",
+    "description": "Mali makes the desert pay. Its cities trade where others merely survive.",
+    "agenda": "merchant",
+    "agenda_text": "Likes wealthy civilizations and trading partners. Distrusts warmongers.",
+    "start_bias": ["desert"],
+    "color_primary": "#b8860b",
+    "color_secondary": "#2b2b2b",
+    "flavors": { "military": 0.35, "expansion": 0.55, "science": 0.55, "culture": 0.6, "faith": 0.75, "gold": 0.95, "production": 0.45, "wonder": 0.6, "naval": 0.3, "diplomacy": 0.7 },
+    "modifiers": [
+      { "id": "mali_desert_gold", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+        "args": { "yields": { "gold": 3, "faith": 1 } },
+        "description": "Songs of the Jeli: +3 Gold and +1 Faith in every city." },
+      { "id": "mali_trade_capacity", "effect": "ADJUST_TRADE_CAPACITY", "scope": "player",
+        "args": { "amount": 1 },
+        "description": "+1 Trade Route capacity." }
+    ]
+  },
+  {
+    "id": "norway_harald",
+    "name": "Harald Hardrada",
+    "civilization": "Norway",
+    "description": "Norway raids coasts, sails deep water early, and takes what it needs from the sea.",
+    "agenda": "raider",
+    "agenda_text": "Admires strong navies. Preys on undefended coastal cities.",
+    "start_bias": ["tundra", "coast"],
+    "color_primary": "#1f4e5f",
+    "color_secondary": "#c9d6df",
+    "flavors": { "military": 0.85, "expansion": 0.6, "science": 0.45, "culture": 0.5, "faith": 0.5, "gold": 0.55, "production": 0.6, "wonder": 0.4, "naval": 0.95, "diplomacy": 0.3 },
+    "modifiers": [
+      { "id": "norway_naval_strength", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit",
+        "args": { "amount": 5 },
+        "description": "Knarr: +5 Combat Strength for naval units.",
+        "requirements": [{ "type": "UNIT_CLASS_IS", "args": { "unit_class": ["naval_melee", "naval_ranged", "naval_raider"] } }] },
+      { "id": "norway_coastal_production", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+        "args": { "yields": { "production": 1 } },
+        "description": "+1 Production in coastal cities.",
+        "requirements": [{ "type": "CITY_IS_COASTAL", "args": {} }] }
+    ]
+  },
+  {
+    "id": "india_ashoka",
+    "name": "Ashoka",
+    "civilization": "India",
+    "description": "India grows enormous cities and spreads its faith without drawing a sword.",
+    "agenda": "peacekeeper",
+    "agenda_text": "Abhors war. Warms to civilizations that stay at peace and share his religion.",
+    "start_bias": ["grassland", "plains"],
+    "color_primary": "#e07a2f",
+    "color_secondary": "#1c3f6e",
+    "flavors": { "military": 0.25, "expansion": 0.55, "science": 0.6, "culture": 0.6, "faith": 0.9, "gold": 0.55, "production": 0.5, "wonder": 0.6, "naval": 0.4, "diplomacy": 0.8 },
+    "modifiers": [
+      { "id": "india_housing", "effect": "ADJUST_CITY_HOUSING", "scope": "city",
+        "args": { "amount": 2 },
+        "description": "Dharma: +2 Housing in every city." },
+      { "id": "india_faith", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+        "args": { "yields": { "faith": 2 } },
+        "description": "+2 Faith in cities with a Holy Site.",
+        "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "holy_site" } }] }
+    ]
+  }
+]

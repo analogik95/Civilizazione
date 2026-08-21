@@ -65,3 +65,16 @@ Thumbs.db
 screenshots/
 saves/
 logs/
+
+# Godot
+.godot/
+.import/
+export.cfg
+export_presets.cfg
+*.translation
+build_out/
+*.tmp
+
+# Blender
+*.blend1
+*.blend2

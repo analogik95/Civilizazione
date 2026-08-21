@@ -1,0 +1,163 @@
+[
+  {
+    "id": "city_center",
+    "name": "City Center",
+    "description": "The heart of the city. Counts as a district for the adjacency of everything built beside it.",
+    "cost": 0,
+    "is_specialty": false,
+    "population_cost": 0,
+    "defense": 10,
+    "yields": { "food": 1, "production": 1 },
+    "buildings": ["palace", "monument", "granary", "ancient_walls", "water_mill"]
+  },
+  {
+    "id": "campus",
+    "name": "Campus",
+    "description": "A place of learning. Site it against mountains and rainforest — the view is worth Science.",
+    "adjacency_yield": "science",
+    "cost": 54,
+    "required_tech": "writing",
+    "population_cost": 3,
+    "adjacency": [
+      { "kind": "terrain", "match": ["mountains"], "amount": 1 },
+      { "kind": "feature", "match": ["rainforest"], "amount": 1, "per": 2 },
+      { "kind": "feature", "match": ["geothermal_fissure", "reef"], "amount": 2 },
+      { "kind": "natural_wonder", "amount": 2 },
+      { "kind": "district", "amount": 1, "per": 2 }
+    ],
+    "great_person_points": { "scientist": 1 },
+    "buildings": ["library", "university"]
+  },
+  {
+    "id": "holy_site",
+    "name": "Holy Site",
+    "description": "Consecrated ground. Mountains, forests and natural wonders all lend it weight.",
+    "adjacency_yield": "faith",
+    "cost": 54,
+    "required_tech": "astrology",
+    "population_cost": 3,
+    "adjacency": [
+      { "kind": "terrain", "match": ["mountains"], "amount": 1 },
+      { "kind": "natural_wonder", "amount": 2 },
+      { "kind": "feature", "match": ["woods"], "amount": 1, "per": 2 },
+      { "kind": "district", "amount": 1, "per": 2 }
+    ],
+    "great_person_points": { "prophet": 1 },
+    "buildings": ["shrine", "temple"]
+  },
+  {
+    "id": "commercial_hub",
+    "name": "Commercial Hub",
+    "description": "Markets and counting houses. Wants a river, or a harbour next door.",
+    "adjacency_yield": "gold",
+    "cost": 54,
+    "required_tech": "currency",
+    "population_cost": 3,
+    "adjacency": [
+      { "kind": "river", "amount": 2 },
+      { "kind": "district", "match": ["harbor"], "amount": 2 },
+      { "kind": "district", "amount": 1, "per": 2 }
+    ],
+    "great_person_points": { "merchant": 1 },
+    "buildings": ["market", "bank"]
+  },
+  {
+    "id": "harbor",
+    "name": "Harbor",
+    "description": "Docks and shipyards. Must be built on the coast, and thrives beside the city itself.",
+    "adjacency_yield": "gold",
+    "cost": 54,
+    "required_tech": "sailing",
+    "population_cost": 3,
+    "requires_coast": true,
+    "adjacency": [
+      { "kind": "district", "match": ["city_center"], "amount": 2 },
+      { "kind": "sea_resource", "amount": 1 },
+      { "kind": "district", "amount": 1, "per": 2 }
+    ],
+    "great_person_points": { "admiral": 1 },
+    "buildings": ["lighthouse", "shipyard"]
+  },
+  {
+    "id": "theater_square",
+    "name": "Theater Square",
+    "description": "Where a civilization performs itself. Wonders and other districts amplify it.",
+    "adjacency_yield": "culture",
+    "cost": 54,
+    "required_civic": "drama_and_poetry",
+    "population_cost": 3,
+    "adjacency": [
+      { "kind": "wonder", "amount": 1 },
+      { "kind": "district", "match": ["entertainment_complex", "water_park"], "amount": 1 },
+      { "kind": "district", "amount": 1, "per": 2 }
+    ],
+    "great_person_points": { "writer": 1, "artist": 1, "musician": 1 },
+    "buildings": ["amphitheater", "archive"]
+  },
+  {
+    "id": "encampment",
+    "name": "Encampment",
+    "description": "Barracks and drill grounds. Adds real defence to the city and trains better soldiers.",
+    "adjacency_yield": "production",
+    "cost": 54,
+    "required_tech": "bronze_working",
+    "population_cost": 3,
+    "defense": 8,
+    "appeal": -1,
+    "adjacency": [],
+    "great_person_points": { "general": 1 },
+    "buildings": ["barracks", "armory"]
+  },
+  {
+    "id": "industrial_zone",
+    "name": "Industrial Zone",
+    "description": "Forges and workshops. Feeds on the mines and quarries around it, and blights the view.",
+    "adjacency_yield": "production",
+    "cost": 54,
+    "required_tech": "apprenticeship",
+    "population_cost": 3,
+    "appeal": -1,
+    "adjacency": [
+      { "kind": "improvement", "match": ["mine", "quarry"], "amount": 1 },
+      { "kind": "district", "amount": 1, "per": 2 }
+    ],
+    "great_person_points": { "engineer": 1 },
+    "buildings": ["workshop", "factory"]
+  },
+  {
+    "id": "aqueduct",
+    "name": "Aqueduct",
+    "description": "Carries water into the city. Must touch the City Center and a source of fresh water.",
+    "cost": 36,
+    "required_tech": "engineering",
+    "population_cost": 0,
+    "is_specialty": false,
+    "requires_adjacent_city_center": true,
+    "adjacency": [],
+    "buildings": []
+  },
+  {
+    "id": "entertainment_complex",
+    "name": "Entertainment Complex",
+    "description": "Arenas and festivals. Buys the contentment that lets a city keep growing.",
+    "cost": 54,
+    "required_civic": "games_and_recreation",
+    "population_cost": 3,
+    "appeal": 1,
+    "adjacency": [],
+    "buildings": ["arena", "zoo"]
+  },
+  {
+    "id": "government_plaza",
+    "name": "Government Plaza",
+    "description": "The seat of the state. One per civilization, and it strengthens every district beside it.",
+    "cost": 54,
+    "required_civic": "political_philosophy",
+    "population_cost": 0,
+    "one_per_civ": true,
+    "defense": 8,
+    "adjacency": [],
+    "amplifies_adjacent_districts": 1,
+    "buildings": ["ancestral_hall"]
+  }
+]

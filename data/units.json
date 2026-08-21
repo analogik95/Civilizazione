@@ -1,0 +1,75 @@
+[
+  { "id": "settler", "name": "Settler", "class": "civilian", "cost": 80, "movement": 2, "sight": 3,
+    "can_found_city": true, "population_cost": 1, "era": 0,
+    "description": "Founds a new city, at the cost of a citizen from the city that built it." },
+
+  { "id": "builder", "name": "Builder", "class": "civilian", "cost": 50, "movement": 2, "sight": 2,
+    "can_build_improvements": true, "charges": 3, "era": 0,
+    "description": "Constructs tile improvements. Carries three charges and is used up when they are spent." },
+
+  { "id": "trader", "name": "Trader", "class": "civilian", "cost": 40, "movement": 2, "sight": 1,
+    "required_civic": "foreign_trade", "era": 0,
+    "description": "Establishes a trade route between two cities." },
+
+  { "id": "warrior", "name": "Warrior", "class": "melee", "combat_strength": 20, "cost": 40,
+    "movement": 2, "sight": 2, "maintenance": 0, "era": 0, "upgrades_to": "swordsman",
+    "description": "The first soldier any civilization fields." },
+
+  { "id": "scout", "name": "Scout", "class": "recon", "combat_strength": 10, "cost": 30,
+    "movement": 3, "sight": 3, "maintenance": 0, "era": 0, "ignores_zoc": true,
+    "description": "Fast and far-seeing. Ignores enemy Zone of Control." },
+
+  { "id": "slinger", "name": "Slinger", "class": "ranged", "combat_strength": 5, "ranged_strength": 15,
+    "range": 1, "cost": 35, "movement": 2, "sight": 2, "maintenance": 0, "era": 0, "upgrades_to": "archer",
+    "description": "Strikes from one tile away. Weak in a melee, but safe behind a spearwall." },
+
+  { "id": "archer", "name": "Archer", "class": "ranged", "combat_strength": 15, "ranged_strength": 25,
+    "range": 2, "cost": 60, "movement": 2, "sight": 2, "maintenance": 1, "era": 0,
+    "required_tech": "archery", "upgrades_to": "crossbowman",
+    "description": "Shoots two tiles. The backbone of any early siege." },
+
+  { "id": "spearman", "name": "Spearman", "class": "anti_cavalry", "combat_strength": 25, "cost": 65,
+    "movement": 2, "sight": 2, "maintenance": 1, "era": 0,
+    "required_tech": "bronze_working", "required_resource": "", "upgrades_to": "pikeman",
+    "description": "Braced against cavalry, which it kills far above its weight." },
+
+  { "id": "heavy_chariot", "name": "Heavy Chariot", "class": "heavy_cavalry", "combat_strength": 28, "cost": 65,
+    "movement": 2, "sight": 2, "maintenance": 1, "era": 0,
+    "required_tech": "wheel", "required_resource": "horses", "resource_cost": 10,
+    "description": "Shock cavalry. Devastating on open ground, clumsy anywhere else." },
+
+  { "id": "horseman", "name": "Horseman", "class": "light_cavalry", "combat_strength": 36, "cost": 80,
+    "movement": 4, "sight": 2, "maintenance": 2, "era": 1,
+    "required_tech": "horseback_riding", "required_resource": "horses", "resource_cost": 10,
+    "description": "Fast enough to choose its fights, and to leave the ones it is losing." },
+
+  { "id": "swordsman", "name": "Swordsman", "class": "melee", "combat_strength": 36, "cost": 90,
+    "movement": 2, "sight": 2, "maintenance": 2, "era": 1,
+    "required_tech": "iron_working", "required_resource": "iron", "resource_cost": 20, "upgrades_to": "musketman",
+    "description": "Iron discipline. The standard of the Classical battle line." },
+
+  { "id": "catapult", "name": "Catapult", "class": "siege", "combat_strength": 25, "ranged_strength": 35,
+    "range": 2, "cost": 120, "movement": 2, "sight": 2, "maintenance": 2, "era": 1,
+    "required_tech": "mathematics", "required_resource": "iron", "resource_cost": 10,
+    "must_set_up_to_attack": true,
+    "description": "Breaks walls. Must be set up before it can fire, so it cannot move and shoot in the same turn." },
+
+  { "id": "galley", "name": "Galley", "class": "naval_melee", "combat_strength": 25, "cost": 65,
+    "movement": 3, "sight": 2, "maintenance": 1, "era": 0, "required_tech": "sailing",
+    "description": "Coastal warship. Cannot venture into deep ocean." },
+
+  { "id": "pikeman", "name": "Pikeman", "class": "anti_cavalry", "combat_strength": 41, "cost": 150,
+    "movement": 2, "sight": 2, "maintenance": 2, "era": 2,
+    "required_tech": "military_engineering", "required_resource": "iron", "resource_cost": 10,
+    "description": "A hedge of pikes. Cavalry breaks on it." },
+
+  { "id": "crossbowman", "name": "Crossbowman", "class": "ranged", "combat_strength": 30, "ranged_strength": 40,
+    "range": 2, "cost": 180, "movement": 2, "sight": 2, "maintenance": 2, "era": 2,
+    "required_tech": "machinery", "required_resource": "iron", "resource_cost": 10,
+    "description": "Punches through armour that stops an arrow." },
+
+  { "id": "musketman", "name": "Musketman", "class": "melee", "combat_strength": 55, "cost": 240,
+    "movement": 2, "sight": 2, "maintenance": 3, "era": 4,
+    "required_tech": "industrialization", "required_resource": "niter", "resource_cost": 20,
+    "description": "Gunpowder makes every previous melee unit obsolete at once." }
+]

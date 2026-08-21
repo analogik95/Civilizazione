@@ -1,0 +1,147 @@
+[
+  {
+    "id": "chiefdom",
+    "name": "Chiefdom",
+    "description": "Rule by custom and personal authority. The starting government, and barely a government at all.",
+    "tier": 0,
+    "required_civic": "",
+    "slots": { "military": 1, "economic": 1, "diplomatic": 0, "wildcard": 0 }
+  },
+  {
+    "id": "autocracy",
+    "name": "Autocracy",
+    "description": "One ruler, one will. Builds monuments quickly and pays for it in flexibility.",
+    "tier": 1,
+    "required_civic": "political_philosophy",
+    "slots": { "military": 2, "economic": 1, "diplomatic": 0, "wildcard": 1 },
+    "influence_per_turn": 1.0,
+    "modifiers": [
+      {
+        "id": "autocracy_wonder_production",
+        "effect": "ADJUST_PRODUCTION_PERCENT",
+        "scope": "city",
+        "args": { "amount": 10 },
+        "description": "+10% Production toward Wonders.",
+        "requirements": [{ "type": "PRODUCTION_KIND_IS", "args": { "kind": ["wonder"] } }]
+      },
+      {
+        "id": "autocracy_capital_yields",
+        "effect": "ADJUST_CITY_YIELD_FLAT",
+        "scope": "city",
+        "args": { "yields": { "science": 1, "culture": 1, "gold": 1 } },
+        "description": "+1 Science, Culture and Gold in the Capital.",
+        "requirements": [{ "type": "CITY_IS_CAPITAL", "args": {} }]
+      }
+    ]
+  },
+  {
+    "id": "oligarchy",
+    "name": "Oligarchy",
+    "description": "Rule by the few who can afford armour. Its soldiers are markedly better than anyone else's this early.",
+    "tier": 1,
+    "required_civic": "political_philosophy",
+    "slots": { "military": 1, "economic": 1, "diplomatic": 1, "wildcard": 1 },
+    "influence_per_turn": 1.0,
+    "modifiers": [
+      {
+        "id": "oligarchy_melee_strength",
+        "effect": "ADJUST_UNIT_COMBAT_STRENGTH",
+        "scope": "unit",
+        "args": { "amount": 4 },
+        "description": "+4 Combat Strength for Melee, Anti-Cavalry and Naval Melee units.",
+        "requirements": [
+          { "type": "UNIT_CLASS_IS", "args": { "unit_class": ["melee", "anti_cavalry", "naval_melee"] } }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "classical_republic",
+    "name": "Classical Republic",
+    "description": "Deliberation and civic duty. Slower to make war, faster to make great people.",
+    "tier": 1,
+    "required_civic": "political_philosophy",
+    "slots": { "military": 0, "economic": 2, "diplomatic": 1, "wildcard": 1 },
+    "influence_per_turn": 1.0,
+    "modifiers": [
+      {
+        "id": "classical_republic_amenity",
+        "effect": "ADJUST_CITY_AMENITIES",
+        "scope": "city",
+        "args": { "amount": 1 },
+        "description": "+1 Amenity in every city with a specialty district.",
+        "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "campus" } }]
+      },
+      {
+        "id": "classical_republic_gpp",
+        "effect": "ADJUST_GREAT_PERSON_POINTS_PERCENT",
+        "scope": "player",
+        "args": { "amount": 15 },
+        "description": "+15% Great Person points."
+      }
+    ]
+  },
+  {
+    "id": "monarchy",
+    "name": "Monarchy",
+    "description": "Hereditary rule with a walled capital. Trades openness for stability and Housing.",
+    "tier": 2,
+    "required_civic": "divine_right",
+    "slots": { "military": 3, "economic": 2, "diplomatic": 1, "wildcard": 1 },
+    "influence_per_turn": 2.0,
+    "modifiers": [
+      {
+        "id": "monarchy_housing",
+        "effect": "ADJUST_CITY_HOUSING",
+        "scope": "city",
+        "args": { "amount": 1 },
+        "description": "+1 Housing in cities with Ancient Walls.",
+        "requirements": [{ "type": "CITY_HAS_BUILDING", "args": { "building": "ancient_walls" } }]
+      }
+    ]
+  },
+  {
+    "id": "theocracy",
+    "name": "Theocracy",
+    "description": "The state as an arm of the faith. Its missionaries and apostles fight far above their weight.",
+    "tier": 2,
+    "required_civic": "divine_right",
+    "slots": { "military": 2, "economic": 2, "diplomatic": 1, "wildcard": 2 },
+    "influence_per_turn": 2.0,
+    "modifiers": [
+      {
+        "id": "theocracy_religious_strength",
+        "effect": "ADJUST_UNIT_COMBAT_STRENGTH",
+        "scope": "unit",
+        "args": { "amount": 5 },
+        "description": "+5 Religious Strength in theological combat.",
+        "requirements": [{ "type": "UNIT_CLASS_IS", "args": { "unit_class": ["religious"] } }]
+      }
+    ]
+  },
+  {
+    "id": "merchant_republic",
+    "name": "Merchant Republic",
+    "description": "Government by those who move goods. Wealthy, well-connected, and hard to rouse to war.",
+    "tier": 2,
+    "required_civic": "guilds",
+    "slots": { "military": 1, "economic": 3, "diplomatic": 2, "wildcard": 1 },
+    "influence_per_turn": 2.0,
+    "modifiers": [
+      {
+        "id": "merchant_republic_trade",
+        "effect": "ADJUST_TRADE_CAPACITY",
+        "scope": "player",
+        "args": { "amount": 2 },
+        "description": "+2 Trade Route capacity."
+      },
+      {
+        "id": "merchant_republic_gold",
+        "effect": "ADJUST_CITY_YIELD_PERCENT",
+        "scope": "city",
+        "args": { "percent": { "gold": 15 } },
+        "description": "+15% Gold in all cities."
+      }
+    ]
+  }
+]

@@ -1,0 +1,70 @@
+[
+  { "id": "geneva", "name": "Geneva", "type": "scientific",
+    "suzerain_text": "+15% Science in all your cities while you are not at war with anyone.",
+    "suzerain_modifiers": [{ "id": "cs_geneva", "effect": "ADJUST_CITY_YIELD_PERCENT", "scope": "city",
+      "args": { "percent": { "science": 15 } },
+      "requirements": [{ "type": "PLAYER_AT_WAR", "args": {}, "inverse": true }] }] },
+
+  { "id": "hattusa", "name": "Hattusa", "type": "scientific",
+    "suzerain_text": "+1 of each strategic resource per turn.",
+    "suzerain_modifiers": [{ "id": "cs_hattusa", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+      "args": { "yields": { "science": 1, "production": 1 } },
+      "requirements": [{ "type": "CITY_IS_CAPITAL", "args": {} }] }] },
+
+  { "id": "kumasi", "name": "Kumasi", "type": "cultural",
+    "suzerain_text": "+2 Culture in every city with a Commercial Hub.",
+    "suzerain_modifiers": [{ "id": "cs_kumasi", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+      "args": { "yields": { "culture": 2 } },
+      "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "commercial_hub" } }] }] },
+
+  { "id": "auckland", "name": "Auckland", "type": "industrial",
+    "suzerain_text": "+1 Production in every coastal city.",
+    "suzerain_modifiers": [{ "id": "cs_auckland", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+      "args": { "yields": { "production": 1 } },
+      "requirements": [{ "type": "CITY_IS_COASTAL", "args": {} }] }] },
+
+  { "id": "jerusalem", "name": "Jerusalem", "type": "religious",
+    "suzerain_text": "+3 Faith in your capital.",
+    "suzerain_modifiers": [{ "id": "cs_jerusalem", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+      "args": { "yields": { "faith": 3 } },
+      "requirements": [{ "type": "CITY_IS_CAPITAL", "args": {} }] }] },
+
+  { "id": "kabul", "name": "Kabul", "type": "militaristic",
+    "suzerain_text": "Your units earn double experience from fighting.",
+    "suzerain_modifiers": [{ "id": "cs_kabul", "effect": "ADJUST_UNIT_EXPERIENCE_PERCENT", "scope": "unit",
+      "args": { "amount": 100 } }] },
+
+  { "id": "valletta", "name": "Valletta", "type": "militaristic",
+    "suzerain_text": "+4 City Combat Strength in all your cities.",
+    "suzerain_modifiers": [{ "id": "cs_valletta", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "city",
+      "args": { "amount": 4 } }] },
+
+  { "id": "zanzibar", "name": "Zanzibar", "type": "trade",
+    "suzerain_text": "+3 Gold in every city with a Commercial Hub.",
+    "suzerain_modifiers": [{ "id": "cs_zanzibar", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+      "args": { "yields": { "gold": 3 } },
+      "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "commercial_hub" } }] }] },
+
+  { "id": "lisbon", "name": "Lisbon", "type": "trade",
+    "suzerain_text": "+2 Gold in every coastal city.",
+    "suzerain_modifiers": [{ "id": "cs_lisbon", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+      "args": { "yields": { "gold": 2 } },
+      "requirements": [{ "type": "CITY_IS_COASTAL", "args": {} }] }] },
+
+  { "id": "antananarivo", "name": "Antananarivo", "type": "cultural",
+    "suzerain_text": "+1 Culture in every city, and more as you earn Great People.",
+    "suzerain_modifiers": [{ "id": "cs_antananarivo", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+      "args": { "yields": { "culture": 1 } }}] },
+
+  { "id": "brussels", "name": "Brussels", "type": "industrial",
+    "suzerain_text": "+15% Production toward Wonders.",
+    "suzerain_modifiers": [{ "id": "cs_brussels", "effect": "ADJUST_PRODUCTION_PERCENT", "scope": "city",
+      "args": { "amount": 15 },
+      "requirements": [{ "type": "PRODUCTION_KIND_IS", "args": { "kind": ["wonder"] } }] }] },
+
+  { "id": "yerevan", "name": "Yerevan", "type": "religious",
+    "suzerain_text": "+2 Faith in every city with a Holy Site.",
+    "suzerain_modifiers": [{ "id": "cs_yerevan", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city",
+      "args": { "yields": { "faith": 2 } },
+      "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "holy_site" } }] }] }
+]

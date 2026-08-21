@@ -1,0 +1,78 @@
+[
+  {
+    "id": "grassland",
+    "name": "Grassland",
+    "description": "Lush, well-watered flatland. The best food per tile of any land terrain.",
+    "yields": { "food": 2 },
+    "movement_cost": 1,
+    "appeal": 0
+  },
+  {
+    "id": "plains",
+    "name": "Plains",
+    "description": "Open, workable land that trades a little food for useful production.",
+    "yields": { "food": 1, "production": 1 },
+    "movement_cost": 1,
+    "appeal": 0
+  },
+  {
+    "id": "desert",
+    "name": "Desert",
+    "description": "Barren sand. Yields nothing on its own, but hides oases and often sits on strategic resources.",
+    "yields": {},
+    "movement_cost": 1,
+    "appeal": 0
+  },
+  {
+    "id": "tundra",
+    "name": "Tundra",
+    "description": "Cold, thin soil at the edge of the habitable world.",
+    "yields": { "food": 1 },
+    "movement_cost": 1,
+    "appeal": 0
+  },
+  {
+    "id": "snow",
+    "name": "Snow",
+    "description": "Permanent ice cap. Effectively worthless to work, but still claims territory.",
+    "yields": {},
+    "movement_cost": 1,
+    "appeal": -1
+  },
+  {
+    "id": "mountains",
+    "name": "Mountains",
+    "description": "Impassable peaks. Cannot be worked or crossed, but grants Appeal and feeds Campus and Holy Site adjacency.",
+    "yields": {},
+    "movement_cost": 999,
+    "is_impassable": true,
+    "appeal": 4
+  },
+  {
+    "id": "coast",
+    "name": "Coast",
+    "description": "Shallow water within reach of land. Workable, and required for Harbours.",
+    "yields": { "food": 1, "gold": 1 },
+    "is_water": true,
+    "movement_cost": 1,
+    "appeal": 1
+  },
+  {
+    "id": "ocean",
+    "name": "Ocean",
+    "description": "Deep water. Impassable until the open sea is mastered.",
+    "yields": { "food": 1 },
+    "is_water": true,
+    "movement_cost": 1,
+    "appeal": 0
+  },
+  {
+    "id": "lake",
+    "name": "Lake",
+    "description": "Inland fresh water. Supplies Housing to any adjacent city.",
+    "yields": { "food": 1, "gold": 1 },
+    "is_water": true,
+    "movement_cost": 1,
+    "appeal": 1
+  }
+]

@@ -1,0 +1,75 @@
+[
+  {
+    "id": "sunken_atoll",
+    "name": "The Sunken Atoll",
+    "description": "A drowned volcanic ring teeming with life. Rich fishing and a natural laboratory.",
+    "yields": { "food": 3, "science": 2 },
+    "tile_count": 2,
+    "is_impassable": false,
+    "requires_water": true,
+    "requires_land": false
+  },
+  {
+    "id": "whitecliff_coast",
+    "name": "Whitecliff Coast",
+    "description": "Sheer chalk cliffs rising straight from the sea.",
+    "yields": { "culture": 3, "gold": 3 },
+    "tile_count": 2,
+    "is_impassable": false,
+    "requires_land": true
+  },
+  {
+    "id": "the_caldera",
+    "name": "The Caldera",
+    "description": "A collapsed volcano flooded into a deep blue lake.",
+    "yields": { "science": 1, "faith": 5 },
+    "tile_count": 1,
+    "is_impassable": true,
+    "requires_land": true
+  },
+  {
+    "id": "singing_sands",
+    "name": "The Singing Sands",
+    "description": "Dunes that hum in the wind. Pilgrims have crossed deserts to hear them.",
+    "yields": { "faith": 4, "gold": 2 },
+    "tile_count": 1,
+    "is_impassable": true,
+    "requires_land": true
+  },
+  {
+    "id": "skyreach_pinnacle",
+    "name": "Skyreach Pinnacle",
+    "description": "A solitary spire of rock. Every civilization that has seen it has called it holy.",
+    "yields": { "faith": 3, "culture": 2 },
+    "tile_count": 1,
+    "is_impassable": true,
+    "requires_land": true
+  },
+  {
+    "id": "everflame_vents",
+    "name": "The Everflame Vents",
+    "description": "Geothermal fissures that have burned without pause for as long as anyone has recorded.",
+    "yields": { "production": 2, "science": 3 },
+    "tile_count": 1,
+    "is_impassable": true,
+    "requires_land": true
+  },
+  {
+    "id": "the_verdant_basin",
+    "name": "The Verdant Basin",
+    "description": "A sheltered valley of impossible fertility.",
+    "yields": { "food": 4, "culture": 1 },
+    "tile_count": 2,
+    "is_impassable": false,
+    "requires_land": true
+  },
+  {
+    "id": "wellspring_of_ages",
+    "name": "Wellspring of Ages",
+    "description": "Waters said to restore the weary. Units that drink here recover fully.",
+    "yields": { "science": 4, "faith": 4 },
+    "tile_count": 1,
+    "is_impassable": false,
+    "requires_land": true
+  }
+]
