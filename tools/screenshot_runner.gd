@@ -68,12 +68,33 @@ func run(options: Dictionary) -> bool:
 		_focus_point(), cities.get_child_count(), units.get_child_count(),
 		world.get_child_count(),
 	])
-	for city: CityState in Game.cities.values():
-		print("  city %d '%s' pop %d at %v -> %v" % [
-			city.id, city.name, city.population, city.coord,
-			Hex.to_world(city.coord, ArtPalette.HEX_SIZE),
-		])
+	_print_terrain_census()
 	return true
+
+
+## What the generator actually produced. A map that looks wrong usually is
+## wrong, and the histogram says so faster than staring at it does.
+func _print_terrain_census() -> void:
+	var terrain: Dictionary = {}
+	var features: Dictionary = {}
+	var hills := 0
+	var total := 0
+	for tile: Tile in Game.map.all_tiles():
+		terrain[tile.terrain_id] = int(terrain.get(tile.terrain_id, 0)) + 1
+		if tile.feature_id != &"":
+			features[tile.feature_id] = int(features.get(tile.feature_id, 0)) + 1
+		if tile.is_hills:
+			hills += 1
+		total += 1
+
+	print("  terrain census of %d tiles:" % total)
+	var names: Array = terrain.keys()
+	names.sort_custom(func(a: Variant, b: Variant) -> bool: return terrain[a] > terrain[b])
+	for name: Variant in names:
+		print("    %-12s %5d  %5.1f%%" % [name, terrain[name], 100.0 * terrain[name] / total])
+	print("    %-12s %5d  %5.1f%% (of land)" % ["hills", hills, 100.0 * hills / maxi(total, 1)])
+	for name: Variant in features:
+		print("    feature %-10s %5d" % [name, features[name]])
 
 
 ## Aim at the busiest part of the map: the largest city if any has been founded,

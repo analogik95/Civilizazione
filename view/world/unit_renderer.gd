@@ -195,7 +195,7 @@ func _update_health_bar(bar: Node3D, unit: UnitState) -> void:
 func _position_for(unit: UnitState, coord: Vector2i) -> Vector3:
 	var tile: Tile = Game.map.get_tile(coord) if Game.map != null else null
 	var position := Hex.to_world(coord, ArtPalette.HEX_SIZE)
-	position.y = ArtPalette.surface_height(tile) if tile != null else 0.0
+	position.y = TerrainMesh.surface_height(tile) if tile != null else 0.0
 	if not unit.is_military():
 		position += STACK_OFFSET
 	else:

@@ -23,7 +23,8 @@ var map: MapModel = null
 ## map editor and the AI-vs-AI observer mode want.
 var viewing_player_id: int = -1
 
-var _terrain_layers: Dictionary = {}   # model stem -> MultiMeshInstance3D
+var _land: MeshInstance3D = null
+var _water: MeshInstance3D = null
 var _prop_layers: Dictionary = {}      # model stem -> MultiMeshInstance3D
 ## coord -> [[layer stem, instance index], ...] so a single tile can be repainted
 ## without rebuilding the whole map.
@@ -49,18 +50,15 @@ func build(p_map: MapModel) -> void:
 	if map == null:
 		return
 
-	# Two passes: bucket every tile by the model it needs, then build one
-	# multimesh per bucket. Building them incrementally would mean resizing each
-	# multimesh once per tile, which is O(n^2) in instance copies.
-	var terrain_buckets: Dictionary = {}
-	var prop_buckets: Dictionary = {}
+	_build_ground()
 
+	# Props are bucketed by model and drawn as one multimesh each. Building them
+	# incrementally would resize every multimesh once per tile, which is O(n^2)
+	# in instance copies.
+	var prop_buckets: Dictionary = {}
 	for tile: Tile in map.all_tiles():
-		_bucket_terrain(tile, terrain_buckets)
 		_bucket_props(tile, prop_buckets)
 
-	for stem: String in terrain_buckets:
-		_build_layer(stem, "terrain", terrain_buckets[stem], _terrain_layers)
 	for key: String in prop_buckets:
 		var parts := key.split("/", true, 1)
 		_build_layer(key, parts[0], prop_buckets[key], _prop_layers)
@@ -73,9 +71,10 @@ func build(p_map: MapModel) -> void:
 func _clear() -> void:
 	for child in get_children():
 		child.queue_free()
-	_terrain_layers.clear()
 	_prop_layers.clear()
 	_tile_instances.clear()
+	_land = null
+	_water = null
 	_rivers = null
 	_borders = null
 
@@ -84,23 +83,24 @@ func _clear() -> void:
 # Bucketing
 # -------------------------------------------------------------------------
 
-func _bucket_terrain(tile: Tile, buckets: Dictionary) -> void:
-	var stem := ArtPalette.terrain_model(tile)
-	var entry: Array = buckets.get_or_add(stem, [])
-	entry.append({
-		"coord": tile.coord,
-		"transform": _tile_transform(tile),
-		"color": ArtPalette.terrain_tint(tile),
-		"y_scale": ArtPalette.terrain_height_scale(tile),
-	})
+## The land and water surfaces. Two meshes for the whole map, welded so that
+## neighbouring hexes share their corner vertices — see TerrainMesh for why that
+## matters.
+func _build_ground() -> void:
+	var land := TerrainMesh.build_land(map, ArtPalette.HEX_SIZE)
+	if land != null:
+		_land = MeshInstance3D.new()
+		_land.name = "Land"
+		_land.mesh = land
+		add_child(_land)
 
-
-## Rotation and position only — scale is applied once in _build_layer, from the
-## mesh's own measured width, so that tiles tessellate exactly. Scaling here as
-## well would compound the two and blow every tile up into its neighbours.
-func _tile_transform(tile: Tile) -> Transform3D:
-	var origin := Hex.to_world(tile.coord, ArtPalette.HEX_SIZE)
-	return Transform3D(Basis(Vector3.UP, ArtPalette.MESH_YAW), origin)
+	var water := TerrainMesh.build_water(map, ArtPalette.HEX_SIZE)
+	if water != null:
+		_water = MeshInstance3D.new()
+		_water.name = "Water"
+		_water.mesh = water
+		_water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(_water)
 
 
 ## Features, resources, improvements and districts all become props standing on
@@ -112,7 +112,7 @@ func _bucket_props(tile: Tile, buckets: Dictionary) -> void:
 		return
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(tile.coord) ^ PROP_SEED
-	var surface := ArtPalette.surface_height(tile)
+	var surface := TerrainMesh.surface_height(tile)
 
 	# A district replaces the tile's natural dressing entirely.
 	if tile.has_district():
@@ -216,7 +216,7 @@ func _build_layer(key: String, group: String, entries: Array, registry: Dictiona
 
 
 func _layer(key: String) -> MultiMeshInstance3D:
-	return _terrain_layers.get(key, _prop_layers.get(key))
+	return _prop_layers.get(key)
 
 
 # -------------------------------------------------------------------------
@@ -238,19 +238,11 @@ func _repaint_tile(tile: Tile) -> void:
 	var records: Array = _tile_instances.get(tile.coord, [])
 	if records.is_empty():
 		return
-	var tint := _tinted_for(tile)
+	var shade := _fog_only(tile)
 	for record: Array in records:
 		var layer := _layer(record[0])
-		if layer == null:
-			continue
-		var base: Color = tint if record[0].begins_with("hex_") else _fog_only(tile)
-		layer.multimesh.set_instance_color(record[1], base)
-
-
-## Terrain tint combined with the fog dim for the viewing player.
-func _tinted_for(tile: Tile) -> Color:
-	var tint := ArtPalette.terrain_tint(tile)
-	return _apply_fog(tile, tint)
+		if layer != null:
+			layer.multimesh.set_instance_color(record[1], shade)
 
 
 func _fog_only(tile: Tile) -> Color:
@@ -346,7 +338,7 @@ func _edge_owner(a: Vector2i, b: Vector2i) -> Vector2i:
 
 func _add_river_edge(surface: SurfaceTool, tile: Tile, direction: int) -> void:
 	var centre := Hex.to_world(tile.coord, ArtPalette.HEX_SIZE)
-	var height := ArtPalette.surface_height(tile) + 0.02
+	var height := TerrainMesh.surface_height(tile) + 0.02
 
 	# The two corners bounding edge `direction` on a flat-top hex sit at
 	# 60-degree steps, offset 30 degrees from the direction's own angle.
@@ -413,7 +405,7 @@ func refresh_borders() -> void:
 
 func _add_border_edge(surface: SurfaceTool, tile: Tile, direction: int, colour: Color) -> void:
 	var centre := Hex.to_world(tile.coord, ArtPalette.HEX_SIZE)
-	var height := ArtPalette.surface_height(tile) + 0.04
+	var height := TerrainMesh.surface_height(tile) + 0.04
 
 	var angle := PI / 3.0 * direction
 	var a := centre + Vector3(
