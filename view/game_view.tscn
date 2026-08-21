@@ -1,0 +1,49 @@
+[gd_scene load_steps=8 format=3 uid="uid://civzgame0001"]
+
+[ext_resource type="Script" path="res://view/game_view.gd" id="1_game"]
+[ext_resource type="Script" path="res://view/world/hex_world.gd" id="2_world"]
+[ext_resource type="Script" path="res://view/world/unit_renderer.gd" id="3_units"]
+[ext_resource type="Script" path="res://view/world/city_renderer.gd" id="4_cities"]
+[ext_resource type="Script" path="res://view/overlays/tile_overlay.gd" id="5_overlay"]
+[ext_resource type="Script" path="res://view/camera_rig.gd" id="6_camera"]
+[ext_resource type="Script" path="res://ui/hud/hud.gd" id="7_hud"]
+
+[node name="GameView" type="Node3D"]
+script = ExtResource("1_game")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.766044, 0.492404, -0.413176, 0, 0.642788, 0.766044, 0.642788, -0.586824, 0.492404, 0, 0, 0)
+light_color = Color(1, 0.96, 0.88, 1)
+shadow_enabled = true
+
+[node name="HexWorld" type="Node3D" parent="."]
+script = ExtResource("2_world")
+
+[node name="UnitRenderer" type="Node3D" parent="."]
+script = ExtResource("3_units")
+
+[node name="CityRenderer" type="Node3D" parent="."]
+script = ExtResource("4_cities")
+
+[node name="TileOverlay" type="Node3D" parent="."]
+script = ExtResource("5_overlay")
+
+[node name="CameraRig" type="Node3D" parent="."]
+script = ExtResource("6_camera")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+current = true
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="HUD" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("7_hud")

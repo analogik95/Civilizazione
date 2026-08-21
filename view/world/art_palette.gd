@@ -322,3 +322,32 @@ static func tile_position(tile: Tile) -> Vector3:
 	var pos := Hex.to_world(tile.coord, HEX_SIZE)
 	pos.y = surface_height(tile)
 	return pos
+
+
+## The world's lighting grade, shared by the interactive game and the screenshot
+## tool so what a screenshot shows is what the game looks like.
+##
+## The grade is deliberately restrained: a low-poly kit lit hard goes chalky,
+## because every surface is a flat colour with no texture detail to hold the
+## shading. Ambient stays low so faces actually differ in brightness, and the
+## saturation lift puts back what tonemapping takes out.
+static func build_environment() -> Environment:
+	var environment := Environment.new()
+	environment.background_mode = Environment.BG_COLOR
+	environment.background_color = Color(0.38, 0.55, 0.72)
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.ambient_light_color = Color(0.50, 0.58, 0.72)
+	environment.ambient_light_energy = 0.34
+
+	environment.fog_enabled = true
+	environment.fog_light_color = Color(0.52, 0.64, 0.78)
+	environment.fog_density = 0.0018
+
+	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
+	environment.tonemap_exposure = 1.05
+	environment.tonemap_white = 3.0
+
+	environment.adjustment_enabled = true
+	environment.adjustment_saturation = 1.16
+	environment.adjustment_contrast = 1.06
+	return environment

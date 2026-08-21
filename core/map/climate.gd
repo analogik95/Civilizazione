@@ -57,9 +57,18 @@ static func simulate(map: MapModel, rng: RandomNumberGenerator) -> Dictionary:
 	var moisture: Dictionary = {}
 	var coords: Array = []
 
+	# Rainfall multiplier per tile, from the atmospheric circulation band it sits
+	# in. Cached per row because it only depends on latitude.
+	var band_factor: Dictionary = {}
+	var row_factor: Dictionary = {}
+
 	for tile: Tile in map.all_tiles():
 		coords.append(tile.coord)
 		clouds[tile.coord] = 0.0
+		var row := MapModel.axial_to_offset(tile.coord).y
+		if not row_factor.has(row):
+			row_factor[row] = circulation_factor(latitude_of(map, row))
+		band_factor[tile.coord] = row_factor[row]
 		# Oceans are an unlimited reservoir; land starts nearly dry and has to
 		# be watered by the cycle, which is what makes interiors arid.
 		moisture[tile.coord] = 1.0 if tile.is_water() else STARTING_MOISTURE
@@ -86,8 +95,11 @@ static func simulate(map: MapModel, rng: RandomNumberGenerator) -> Dictionary:
 				cell_moisture -= evaporated
 				cell_clouds += evaporated
 
-			# 2. Precipitation.
-			var rain := cell_clouds * PRECIPITATION
+			# 2. Precipitation, scaled by the latitude's circulation band. This is
+			#    what puts the desert belt at 25 degrees and the rainforest on the
+			#    equator instead of leaving both to chance.
+			var rain := cell_clouds * PRECIPITATION * float(band_factor[coord])
+			rain = minf(rain, cell_clouds)
 			cell_clouds -= rain
 			cell_moisture += rain
 
@@ -150,11 +162,63 @@ static func temperature_of(
 	map: MapModel, tile: Tile, jitter: FastNoiseLite
 ) -> float:
 	var offset := MapModel.axial_to_offset(tile.coord)
-	var latitude := absf(float(offset.y) / maxf(float(map.height - 1), 1.0) * 2.0 - 1.0)
-	var value := 1.0 - latitude
-	value *= 1.0 - tile.elevation * LAPSE_RATE
+	var latitude := latitude_of(map, offset.y)
+
+	# Earth's mean temperature does not fall linearly from equator to pole — it
+	# holds up across the tropics and then drops away steeply past the
+	# mid-latitudes. A cosine tracks the real annual means closely: normalising
+	# -30..30C to 0..1 gives roughly 0.95 at the equator, 0.71 at 45 degrees and
+	# 0.08 at the pole, which is what cos(latitude * PI/2) produces.
+	#
+	# The straight line this replaces put the 0.32 tundra threshold at 68
+	# degrees of latitude, so a third of every map came out polar.
+	var value := cos(latitude * PI * 0.5)
+
+	# Lapse rate: only height *above sea level* cools a tile. Elevation is
+	# normalised so 0 is the waterline and 1 the highest peak.
+	value *= 1.0 - maxf(tile.elevation, 0.0) * LAPSE_RATE
+
 	value += jitter.get_noise_2d(offset.x, offset.y) * TEMPERATURE_JITTER
 	return clampf(value, 0.0, 1.0)
+
+
+## 0 at the equator, 1 at either pole.
+static func latitude_of(map: MapModel, row: int) -> float:
+	return absf(float(row) / maxf(float(map.height - 1), 1.0) * 2.0 - 1.0)
+
+
+## Rainfall by latitude, following the three-cell atmospheric circulation that
+## gives Earth its deserts.
+##
+## Air rises at the equator and dumps its water there, sinks dry at about 25
+## degrees, rises again along the polar front near 55, and sinks dry over the
+## poles. That single pattern is why the Sahara, Arabian, Kalahari and Atacama
+## all sit at the same latitude, and why rainforest sits on the equator between
+## them.
+##
+## Without this the water cycle only knows about coasts and mountains, so
+## deserts land wherever the wind happens not to reach — which is what made
+## sand appear next to the ice caps.
+const CIRCULATION := [
+	[0.00, 1.35],   # equator, intertropical convergence: wettest place on Earth
+	[0.14, 1.10],
+	[0.27, 0.45],   # subtropical high: the desert belt
+	[0.40, 0.80],
+	[0.58, 1.20],   # polar front: temperate rain
+	[0.78, 0.70],
+	[1.00, 0.40],   # polar desert: cold air carries almost no water
+]
+
+
+static func circulation_factor(latitude: float) -> float:
+	for i in range(CIRCULATION.size() - 1):
+		var low: Array = CIRCULATION[i]
+		var high: Array = CIRCULATION[i + 1]
+		if latitude <= float(high[0]):
+			var span := maxf(float(high[0]) - float(low[0]), 0.0001)
+			var t := (latitude - float(low[0])) / span
+			return lerpf(float(low[1]), float(high[1]), t)
+	return float(CIRCULATION[-1][1])
 
 
 # -------------------------------------------------------------------------
@@ -164,7 +228,7 @@ static func temperature_of(
 ## Temperature band edges, coldest first. These stay absolute: temperature comes
 ## from latitude and altitude, which mean the same thing on every map, and the
 ## poles should be frozen whatever else is going on.
-const TEMPERATURE_BANDS := [0.12, 0.32, 0.62]
+const TEMPERATURE_BANDS := [0.16, 0.36, 0.66]
 
 ## Moisture band edges are *relative* instead — see moisture_bands().
 const MOISTURE_BANDS := [0.14, 0.30, 0.58]
@@ -203,8 +267,8 @@ static func moisture_bands(map: MapModel, moisture: Dictionary) -> Array:
 const BIOMES := [
 	[&"snow", &"snow", &"snow", &"snow"],
 	[&"tundra", &"tundra", &"tundra", &"tundra"],
+	[&"plains", &"plains", &"grassland", &"grassland"],
 	[&"desert", &"plains", &"grassland", &"grassland"],
-	[&"desert", &"desert", &"plains", &"grassland"],
 ]
 
 

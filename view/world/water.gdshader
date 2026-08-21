@@ -22,41 +22,56 @@ uniform vec3 deep_color : source_color = vec3(0.06, 0.20, 0.42);
 uniform vec3 foam_color : source_color = vec3(0.86, 0.94, 0.99);
 
 // How far out from land, in tiles, foam is still visible.
-uniform float foam_reach = 0.34;
-uniform float wave_speed = 0.35;
-uniform float wave_scale = 3.5;
+uniform float foam_reach = 0.45;
+uniform float foam_strength = 0.85;
+uniform float wave_speed = 0.6;
+uniform float wave_scale = 9.0;
 uniform float noise_scale = 0.09;
 
 void fragment() {
-	// 0 at the shoreline, rising with distance out to sea.
-	float shore = UV.y;
+	// UV.y is distance from land, measured in tiles: negative under the beach,
+	// 0 at the waterline, rising out to sea.
+	float shore_distance = UV.y;
 
-	// World-space sampling so the pattern does not swim when the camera moves
-	// and does not repeat per tile.
-	vec2 world_uv = vec2(UV2.x, UV2.y) * noise_scale;
-	float wobble = texture(wave_noise, world_uv + vec2(TIME * 0.012, 0.0)).r - 0.5;
+	// Normalise to the tutorial's convention: 1 at the beach, falling to 0 at
+	// the edge of the surf zone.
+	//
+	// The range has to start at -1, not 0. Corner vertices touching land carry
+	// -1 and the tile centre carries 0, so measuring from 0 saturates every
+	// vertex from the beach to the middle of the first water tile at full foam
+	// — which is what turned the coastline into a solid white halo.
+	float w = clamp((foam_reach - shore_distance) / (foam_reach + 1.0), 0.0, 1.0);
 
-	float distance_in = clamp(shore / foam_reach, 0.0, 1.0);
-	float band = 1.0 - distance_in;
+	// The square root pulls the surf hard against the coast. Without it the
+	// foam fades evenly and reads as a glow rather than breaking water.
+	float shore = sqrt(w);
 
-	// Two fronts, one running in and one running out.
-	float phase = shore * wave_scale + wobble * 1.6;
-	float incoming = sin(phase - TIME * wave_speed * TAU * 0.25);
-	float outgoing = sin(phase * 0.72 + TIME * wave_speed * TAU * 0.17);
-	float crest = max(incoming, outgoing) * 0.5 + 0.5;
+	// World-space noise so the pattern does not swim with the camera or repeat
+	// per tile. Distortion weakens toward the beach so the crests follow the
+	// coastline instead of cutting across it.
+	vec2 world_uv = UV2.xy * noise_scale;
+	float noise = texture(wave_noise, world_uv + vec2(TIME * 0.012, 0.0)).r;
+	float distortion = noise * (1.0 - shore);
 
-	// Squaring the band keeps surf in the last half-tile before the beach. The
-	// tutorial uses sqrt, which widens it instead — right for its scale, where a
-	// cell is ten units across and the shore mesh is a dedicated strip, but here
-	// it washed two full tiles of open sea white.
-	float foam = band * band * crest * 0.8;
-	// A solid lip right at the waterline, so the coast always reads as an edge
-	// even when the waves are at a trough.
-	// A tighter lip right at the waterline so the coast always reads as an edge,
-	// but only in the last fraction of a tile — a wider one floods the shelf.
-	foam = max(foam, smoothstep(-0.05, -0.45, shore) * 0.62);
+	// Two fronts, one running in and one running out, combined with max —
+	// summing them cancels where the crests cross and punches holes in the surf.
+	float t = TIME * wave_speed;
+	float foam1 = sin((shore + distortion - t) * wave_scale);
+	foam1 *= foam1;
+	float foam2 = sin((shore + distortion + t) * wave_scale + 3.14159);
+	foam2 *= foam2;
 
-	vec3 water = mix(shallow_color, deep_color, smoothstep(0.0, 3.0, shore));
+	// Multiplying by shore again is what keeps the waterline itself clear: surf
+	// peaks just off the beach and dies at it, which is what surf actually does.
+	// The old shader instead forced a solid opaque lip along every coast, which
+	// is what made the shore read as a white ring drawn around the land.
+	// Cubed, so surf is confined to the last stretch before the beach and open
+	// water stays open water.
+	float foam = max(foam1, foam2) * shore * shore * shore * foam_strength;
+
+	float distance_in = clamp(shore_distance / foam_reach, 0.0, 1.0);
+
+	vec3 water = mix(shallow_color, deep_color, smoothstep(0.0, 3.0, shore_distance));
 	vec3 albedo = mix(water, foam_color, clamp(foam, 0.0, 1.0));
 
 	// Pack ice is opaque and still: COLOR.a flags it, COLOR.rgb carries it.
@@ -64,8 +79,9 @@ void fragment() {
 	albedo = mix(albedo, COLOR.rgb, ice);
 
 	ALBEDO = albedo;
-	ROUGHNESS = mix(mix(0.55, 0.08, distance_in), 0.85, ice);
+	ROUGHNESS = mix(mix(0.42, 0.08, distance_in), 0.85, ice);
 	METALLIC = 0.2 * distance_in * (1.0 - ice);
 	SPECULAR = 0.6;
-	ALPHA = mix(mix(0.97, 0.88, distance_in), 1.0, ice);
+	// Shallows stay slightly translucent so the beach reads through them.
+	ALPHA = mix(mix(0.88, 0.97, distance_in), 1.0, ice);
 }

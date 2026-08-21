@@ -185,22 +185,22 @@ const MOUNTAIN_COLOR_TOP := Color(0.94, 0.95, 0.97)
 # rebuilds and two tiles always agree about the corner they share.
 
 ## Extra height on the peak vertex, in world units.
-const PEAK_JAG := 0.95
+const PEAK_JAG := 0.62
 ## How far the peak slides off the tile centre, in tile radii.
 const PEAK_DRIFT := 0.34
 ## Height variation around the inner ring, which is what facets the sides.
-const CORE_JAG := 0.68
+const CORE_JAG := 0.40
 
 ## Grey-brown cliff, snow only on the caps.
 const ROCK_LOW := Color(0.26, 0.23, 0.21)
 const ROCK_MID := Color(0.40, 0.37, 0.34)
-const ROCK_HIGH := Color(0.54, 0.52, 0.51)
+const ROCK_HIGH := Color(0.58, 0.56, 0.54)
 const ROCK_SNOW := Color(0.92, 0.94, 0.96)
 
 ## World heights the rock ramp is keyed to. Snow starts high so a mountain is
 ## mostly cliff with a cap, not a white cone.
-const ROCK_BASE_Y := 0.60
-const ROCK_SNOW_Y := 2.25
+const ROCK_BASE_Y := 0.35
+const ROCK_SNOW_Y := 3.20
 
 
 ## Cliff colour at a world height. Used for every vertex of a rocky tile, so the
@@ -253,7 +253,7 @@ static func color_of(tile: Tile) -> Color:
 	# Snow-cap the peaks so a mountain range has a silhouette rather than being
 	# one flat grey mass.
 	if tile.terrain_id == &"mountains":
-		colour = colour.lerp(MOUNTAIN_COLOR_TOP, 0.55)
+		colour = colour.lerp(MOUNTAIN_COLOR_TOP, 0.18)
 	elif tile.is_hills:
 		colour = colour.darkened(0.06)
 	return colour

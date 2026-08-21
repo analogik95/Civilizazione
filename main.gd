@@ -31,6 +31,13 @@ func _ready() -> void:
 		get_tree().quit(0 if saved else 1)
 		return
 
+	if args.has("--play"):
+		var play: Node = preload("res://tools/playtest_runner.gd").new()
+		add_child(play)
+		var passed: bool = await play.run(_parse_options(args))
+		get_tree().quit(0 if passed else 1)
+		return
+
 	_start_interactive()
 
 

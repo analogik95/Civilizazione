@@ -223,6 +223,13 @@ func _assign_climate() -> void:
 ## Fraction of erodible cells to wear away. 0 disables erosion entirely.
 const EROSION_PERCENTAGE := 55
 
+## Share of land tiles that become river headwaters.
+const RIVER_PERCENTAGE := 0.05
+## Chance a basin lake spreads to a second tile.
+const EXTRA_LAKE_CHANCE := 0.45
+## Minimum tiles between two headwaters, so rivers do not braid off one hillside.
+const RIVER_SPACING := 3
+
 ## Elevation gap that counts as a cliff, and so as erodible.
 const CLIFF_GAP := 0.16
 
@@ -302,7 +309,7 @@ func _place_hills_and_mountains() -> void:
 	land_elevations.sort()
 
 	var hill_line: float = land_elevations[int(land_elevations.size() * 0.55)]
-	var mountain_line: float = land_elevations[int(land_elevations.size() * 0.88)]
+	var mountain_line: float = land_elevations[int(land_elevations.size() * 0.80)]
 
 	for tile: Tile in map.tiles.values():
 		if not tile.is_land() or tile.terrain_id == &"lake":
@@ -311,6 +318,35 @@ func _place_hills_and_mountains() -> void:
 			tile.terrain_id = &"mountains"
 		elif tile.elevation >= hill_line:
 			tile.is_hills = true
+
+	_thin_mountains()
+
+
+## Carve the inside out of mountain masses so ranges read as ridges.
+##
+## Thresholding elevation alone produces blobs: every tile in a high region
+## qualifies, so a plateau becomes one solid impassable mass tens of tiles
+## across — which is both ugly and unplayable, since nothing can cross it and
+## no city can work it.
+##
+## Real ranges are lines. Keeping only tiles with open ground on at least two
+## sides erodes each blob down to its outline, which is a ridge, and the
+## interior falls back to hills — high, rough, but passable and workable.
+func _thin_mountains() -> void:
+	var demoted: Array[Tile] = []
+	for tile: Tile in map.tiles.values():
+		if tile.terrain_id != &"mountains":
+			continue
+		var mountain_neighbours := 0
+		for n in map.neighbors(tile.coord):
+			if n.terrain_id == &"mountains":
+				mountain_neighbours += 1
+		if mountain_neighbours >= 5:
+			demoted.append(tile)
+
+	for tile in demoted:
+		tile.terrain_id = &"grassland"   # the climate pass will assign its biome
+		tile.is_hills = true
 
 
 # -------------------------------------------------------------------------
@@ -329,51 +365,72 @@ func _place_hills_and_mountains() -> void:
 ## elevation, so a source needs both the rainfall to feed it and the height to
 ## run downhill from — and the climate simulation above is what makes that score
 ## mean something.
+## Rivers, seeded where the rain actually falls.
+##
+## Ported from part 26 of Catlike Coding's hex map series. Origins are weighted
+## by moisture and height, so rivers start in wet uplands rather than on
+## whichever peak happened to be tallest — a dry mountain in a rain shadow
+## should not be a headwater, and before this every mountain was one.
+##
+## A river then walks downhill to the sea. When it cannot, it has found a basin,
+## and a lake forms there instead — which is where most of the map's lakes now
+## come from.
 func _trace_rivers() -> void:
-	var candidates: Array[Tile] = []
-	var fitness: Dictionary = {}
-
-	# Elevation is absolute 0..1, most of which is under water, so a source is
-	# scored on how high it stands above the shoreline rather than above zero.
-	var sea_level := _sea_level
-	var highest := sea_level
-	for tile: Tile in map.tiles.values():
-		if tile.is_land():
-			highest = maxf(highest, tile.elevation)
-	var span := maxf(highest - sea_level, 0.001)
-
-	for tile: Tile in map.tiles.values():
-		if not tile.is_land() or tile.terrain_id == &"lake":
+	# Score every inland tile as a headwater: wet uplands first.
+	#
+	# The weights are ranked rather than compared against fixed cutoffs.
+	# Elevation is normalised so most land sits well below 0.3 and moisture
+	# rarely tops 0.5, so any absolute threshold either passes everything or —
+	# as the first version of this did — almost nothing, and the map came out
+	# with three rivers on it.
+	var scored: Array = []
+	for tile: Tile in map.all_tiles():
+		if not tile.is_land() or tile.terrain_id == &"mountains":
 			continue
-		var moisture := float(_moisture.get(tile.coord, 0.0))
-		var relief := clampf((tile.elevation - sea_level) / span, 0.0, 1.0)
-		candidates.append(tile)
-		fitness[tile.coord] = moisture * relief
+		if _touches_water(tile):
+			continue   # a river starting here would be one tile long
+		var weight := float(_moisture.get(tile.coord, 0.0)) * (0.35 + clampf(tile.elevation, 0.0, 1.0))
+		if weight <= 0.0:
+			continue
+		scored.append({"tile": tile, "weight": weight})
 
-	if candidates.is_empty():
+	if scored.is_empty():
 		return
 
-	candidates.sort_custom(func(a: Tile, b: Tile) -> bool:
-		return float(fitness[a.coord]) > float(fitness[b.coord]))
+	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return a["weight"] > b["weight"])
 
-	var target := maxi(4, int(map.width * map.height * 0.0035))
+	var land_count := 0
+	for tile: Tile in map.all_tiles():
+		if tile.is_land():
+			land_count += 1
+
+	var budget := maxi(3, int(land_count * RIVER_PERCENTAGE))
+	# Draw from the wettest half, so the choice stays random but never picks a
+	# tile in a rain shadow.
+	var pool := maxi(1, int(scored.size() * 0.5))
 	var placed := 0
-	var attempt := 0
 
-	while placed < target and attempt < candidates.size():
-		var source: Tile = candidates[attempt]
-		attempt += 3   # spread sources out so rivers do not all share a headwater
+	for attempt in pool * 4:
+		if placed >= budget:
+			break
+		var source: Tile = scored[_rng.randi_range(0, pool - 1)]["tile"]
+		if source.is_water() or _near_river(source.coord, RIVER_SPACING):
+			continue
 		if _trace_one_river(source):
 			placed += 1
 
 
+## Walk downhill to the sea, marking the edge crossed at each step.
+##
+## Returns false for a river too short to be worth keeping, in which case
+## nothing is written to the map.
 func _trace_one_river(source: Tile) -> bool:
 	var current := source
 	var visited := {current.coord: true}
 	var path_edges: Array = []
 
-	for _step in 40:
-		# Follow the steepest descent, but only to a tile we have not used.
+	for _step in 60:
 		var best: Tile = null
 		var best_direction := -1
 		var best_elevation := current.elevation
@@ -383,21 +440,71 @@ func _trace_one_river(source: Tile) -> bool:
 			if n == null or visited.has(n.coord):
 				continue
 			if n.is_water():
-				# Reached the sea — commit the river.
+				# Reached the sea or an existing lake — commit.
 				path_edges.append([current.coord, direction])
+				if path_edges.size() < 2:
+					return false
 				_commit_river(path_edges)
-				return path_edges.size() >= 2
+				return true
 			if n.elevation < best_elevation:
 				best_elevation = n.elevation
 				best = n
 				best_direction = direction
 
 		if best == null:
-			break
+			# Nowhere lower to go. A river that has run any distance has found a
+			# basin, so it pools there rather than simply stopping in a field.
+			if path_edges.size() >= 2:
+				_form_lake(current)
+				_commit_river(path_edges)
+				return true
+			return false
+
 		path_edges.append([current.coord, best_direction])
 		visited[best.coord] = true
 		current = best
 
+	return false
+
+
+## Flood a basin into a lake. The tile becomes fresh water sitting just below
+## the land around it, which is what makes it read as a lake rather than a hole.
+func _form_lake(tile: Tile) -> void:
+	var lowest := INF
+	for n in map.neighbors(tile.coord):
+		lowest = minf(lowest, n.elevation)
+
+	tile.terrain_id = &"lake"
+	tile.feature_id = &""
+	tile.is_hills = false
+	tile.elevation = minf(tile.elevation, lowest) - 0.01
+
+	# A lone puddle is noise; give a fair share of lakes a second tile so they
+	# read as water bodies.
+	if _rng.randf() < EXTRA_LAKE_CHANCE:
+		var options: Array[Tile] = []
+		for n in map.neighbors(tile.coord):
+			if n.is_land() and n.terrain_id != &"mountains":
+				options.append(n)
+		if not options.is_empty():
+			var second: Tile = options[_rng.randi_range(0, options.size() - 1)]
+			second.terrain_id = &"lake"
+			second.feature_id = &""
+			second.is_hills = false
+			second.elevation = tile.elevation
+
+
+func _touches_water(tile: Tile) -> bool:
+	for n in map.neighbors(tile.coord):
+		if n.is_water():
+			return true
+	return false
+
+
+func _near_river(coord: Vector2i, radius: int) -> bool:
+	for tile in map.tiles_within(coord, radius):
+		if tile.has_river():
+			return true
 	return false
 
 
@@ -411,10 +518,6 @@ func _commit_river(path_edges: Array) -> void:
 		var edge := (direction + 1) % Hex.DIRECTION_COUNT
 		map.set_river(coord, edge, true)
 
-
-# -------------------------------------------------------------------------
-# Features
-# -------------------------------------------------------------------------
 
 func _place_features() -> void:
 	var forest_noise := FastNoiseLite.new()

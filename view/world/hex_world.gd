@@ -66,6 +66,7 @@ func build(p_map: MapModel) -> void:
 	refresh_rivers()
 	refresh_borders()
 	refresh_fog()
+	_add_wrap_copies()
 
 
 func _clear() -> void:
@@ -515,3 +516,54 @@ func _add_border_edge(surface: SurfaceTool, tile: Tile, direction: int, colour: 
 
 	surface.add_vertex(p0); surface.add_vertex(p1); surface.add_vertex(p2)
 	surface.add_vertex(p0); surface.add_vertex(p2); surface.add_vertex(p3)
+
+
+# -------------------------------------------------------------------------
+# Wrapping
+# -------------------------------------------------------------------------
+
+## World-space offset of one full lap around the map.
+##
+## A wrapped map has no east or west edge in the simulation — a unit walking off
+## one side arrives at the other — but the mesh stops dead at column zero, so
+## the player sees the world end. Panning across the seam looked like falling
+## off the map.
+##
+## Rather than teleport chunks as the camera moves, the whole world is drawn
+## three times: once in place and once to either side. The copies share the same
+## mesh and multimesh resources, so this costs draw calls but no extra memory,
+## and the seam simply never appears.
+func wrap_offset() -> Vector3:
+	if map == null or not map.wrap_x:
+		return Vector3.ZERO
+	return Hex.to_world(MapModel.offset_to_axial(map.width, 0), ArtPalette.HEX_SIZE) \
+		- Hex.to_world(MapModel.offset_to_axial(0, 0), ArtPalette.HEX_SIZE)
+
+
+func _add_wrap_copies() -> void:
+	var offset := wrap_offset()
+	if offset == Vector3.ZERO:
+		return
+
+	var originals: Array[Node] = []
+	for child in get_children():
+		if child is MeshInstance3D or child is MultiMeshInstance3D:
+			originals.append(child)
+
+	for original: Node in originals:
+		for direction in [-1.0, 1.0]:
+			var copy: Node3D = null
+			if original is MultiMeshInstance3D:
+				var multi := MultiMeshInstance3D.new()
+				multi.multimesh = (original as MultiMeshInstance3D).multimesh
+				multi.material_override = (original as MultiMeshInstance3D).material_override
+				copy = multi
+			else:
+				var mesh_instance := MeshInstance3D.new()
+				mesh_instance.mesh = (original as MeshInstance3D).mesh
+				mesh_instance.material_override = (original as MeshInstance3D).material_override
+				mesh_instance.cast_shadow = (original as MeshInstance3D).cast_shadow
+				copy = mesh_instance
+			copy.name = "%s_wrap%d" % [original.name, int(direction)]
+			copy.position = offset * direction
+			add_child(copy)

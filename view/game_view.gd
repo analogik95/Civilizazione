@@ -7,10 +7,17 @@ extends Node3D
 ## it calls UnitSystem/CitySystem and lets the resulting EventBus signals update
 ## what is drawn.
 
-@onready var _world: Node3D = $HexWorld
-@onready var _actors: Node3D = $ActorLayer
+@onready var _world: HexWorld = $HexWorld
+@onready var _units: UnitRenderer = $UnitRenderer
+@onready var _cities: CityRenderer = $CityRenderer
+@onready var _overlay: TileOverlay = $TileOverlay
 @onready var _camera_rig: Node3D = $CameraRig
 @onready var _hud: Control = $UI/HUD
+@onready var _environment: WorldEnvironment = $WorldEnvironment
+
+## The ring drawn under the selected unit. Parented to the unit's own view so it
+## follows the movement tween for free.
+var _selection_ring: Node3D = null
 
 var _human_id: int = 0
 var _selected_unit: UnitState = null
@@ -22,8 +29,14 @@ var _reachable: Array[Vector2i] = []
 func _ready() -> void:
 	_human_id = _find_human()
 
-	_world.set_viewer(_human_id)
-	_actors.set_viewer(_human_id)
+	# Same grade the screenshot tool uses, so a screenshot is an honest preview.
+	_environment.environment = ArtPalette.build_environment()
+
+	_world.viewing_player_id = _human_id
+	_world.build(Game.map)
+	_units.viewing_player_id = _human_id
+	_units.rebuild()
+	_cities.rebuild()
 	_camera_rig.set_map_bounds(Game.map)
 
 	_hud.setup(_human_id)
@@ -33,7 +46,7 @@ func _ready() -> void:
 
 	EventBus.player_turn_started.connect(_on_player_turn_started)
 	EventBus.game_over.connect(_on_game_over)
-	EventBus.city_population_changed.connect(func(_id: int, _p: int) -> void: _actors.refresh_labels())
+	# The city renderer redraws itself on population change; nothing to do here.
 
 	# Open on the capital, or the first unit if no city exists yet.
 	var start := _starting_focus()
@@ -123,16 +136,46 @@ func _on_click(coord: Vector2i) -> void:
 
 func _select(unit: UnitState) -> void:
 	_selected_unit = unit
-	_actors.select_unit(unit.id)
+	_attach_selection_ring(unit)
 	_update_reachable()
 	_hud.set_selected_unit(unit)
 
 
 func _clear_selection() -> void:
 	_selected_unit = null
-	_actors.select_unit(-1)
-	_world.clear_overlay()
+	_attach_selection_ring(null)
+	_overlay.clear()
 	_hud.set_selected_unit(null)
+
+
+## Move the selection ring onto a unit's view node, so it tracks the unit
+## through its movement animation without any per-frame work here.
+func _attach_selection_ring(unit: UnitState) -> void:
+	if _selection_ring != null:
+		_selection_ring.queue_free()
+		_selection_ring = null
+	if unit == null:
+		return
+
+	var view: Node3D = _units.view_for(unit.id)
+	if view == null:
+		return
+
+	var ring := MeshInstance3D.new()
+	var mesh := TorusMesh.new()
+	mesh.inner_radius = ArtPalette.HEX_SIZE * 0.34
+	mesh.outer_radius = ArtPalette.HEX_SIZE * 0.44
+	mesh.rings = 6
+	ring.mesh = mesh
+
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(1.0, 0.93, 0.42)
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ring.material_override = material
+	ring.position.y = 0.06
+
+	view.add_child(ring)
+	_selection_ring = ring
 
 
 func _refresh_selection() -> void:
@@ -149,7 +192,7 @@ func _refresh_selection() -> void:
 func _update_reachable() -> void:
 	_reachable.clear()
 	if _selected_unit == null or _selected_unit.movement_left <= 0.0:
-		_world.clear_overlay()
+		_overlay.clear()
 		return
 
 	var budget := _selected_unit.movement_left
@@ -170,7 +213,7 @@ func _update_reachable() -> void:
 			_reachable.append(neighbour.coord)
 			frontier.append(neighbour.coord)
 
-	_world.show_overlay(_reachable, Color(0.4, 0.8, 1.0, 0.22))
+	_overlay.show_tiles(_reachable, Color(0.42, 0.78, 1.0, 0.26))
 
 
 func _select_next_idle_unit() -> void:
@@ -290,8 +333,9 @@ func _run_ai_until_human() -> void:
 		if guard % 4 == 0:
 			await get_tree().process_frame
 
-	_world.rebuild()
-	_actors.refresh_labels()
+	_world.build(Game.map)
+	_units.rebuild()
+	_cities.rebuild()
 	_hud.refresh()
 	_select_next_idle_unit()
 
