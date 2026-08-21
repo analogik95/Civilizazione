@@ -70,7 +70,7 @@ func _create_view(city: CityState) -> void:
 
 	var root := Node3D.new()
 	root.name = "City%d" % city.id
-	var position := Hex.to_world(city.coord, ArtPalette.HEX_SIZE)
+	var position := TerrainMesh.perturb(Hex.to_world(city.coord, ArtPalette.HEX_SIZE))
 	position.y = TerrainMesh.surface_height(tile)
 	root.position = position
 

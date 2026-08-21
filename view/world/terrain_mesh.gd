@@ -29,8 +29,88 @@ extends RefCounted
 const WELD := 1000.0
 
 ## Fraction of the tile that stays flat at its own height and colour. The rest
-## is the blend ring out to the shared corners.
-const CORE_RADIUS := 0.58
+## is the blend ring out to the shared corners. Catlike Coding's hex map series
+## settles on 0.75 for the same split; much below that and the flat core gets
+## too small to read as a tile.
+const CORE_RADIUS := 0.72
+
+# -------------------------------------------------------------------------
+# Perturbation
+# -------------------------------------------------------------------------
+#
+# The single technique that stops a hex map from looking like a hex map, taken
+# from part 4 of Catlike Coding's series.
+#
+# Every mesh vertex is displaced horizontally by a noise function *of its own
+# position*. Because the displacement depends only on where the vertex is, two
+# hexes computing the same shared corner independently arrive at the same
+# displaced point — so the mesh never cracks, but no hexagon is a regular
+# hexagon any more. Coastlines stop being staircases, tile boundaries stop being
+# straight lines, and the grid dissolves into terrain while every cell stays
+# exactly where the simulation thinks it is.
+#
+# Note this is applied to *presentation only*. Hex.to_world remains the
+# authoritative position, and anything placed on the map — props, units, cities,
+# rivers, borders — must run through perturb() as well or it will float away
+# from the ground it is standing on.
+
+## Horizontal displacement in world units.
+##
+## Catlike displaces by up to 0.4 of the hex radius, reading a Perlin *texture*
+## whose samples cover the full 0..1 range and are remapped to -1..1. Simplex
+## noise does not behave like that — FastNoiseLite rarely returns anything near
+## +/-1, and in practice this map sees around 0.4 of the nominal range. So the
+## constant is scaled up to land in the same place: measured displacement comes
+## out near 0.3 of a hex radius, not the 0.7 the number suggests.
+const PERTURB_STRENGTH := 0.72
+
+## Noise frequency, tuned against the width of the blend ring.
+##
+## This is the constraint Catlike means by "points that lie close together tend
+## to stick together, instead of being distorted in opposite directions". The
+## ring between the flat core and the tile rim is only (1 - CORE_RADIUS) wide.
+## If the noise varies appreciably over that distance, the outer ring can be
+## pushed past the inner one, the ring triangles invert, and the mesh tears into
+## dark slivers. A wavelength of several hex radii keeps each tile's vertices
+## moving as a group while the coastline still wanders over larger scales.
+const PERTURB_FREQUENCY := 0.18
+
+static var _noise_x: FastNoiseLite = null
+static var _noise_z: FastNoiseLite = null
+
+
+static func _ensure_noise() -> void:
+	if _noise_x != null:
+		return
+	_noise_x = FastNoiseLite.new()
+	_noise_x.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	_noise_x.frequency = PERTURB_FREQUENCY
+	_noise_x.seed = 1
+	_noise_z = FastNoiseLite.new()
+	_noise_z.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	_noise_z.frequency = PERTURB_FREQUENCY
+	# A different seed, or X and Z would displace identically and every vertex
+	# would slide along the same diagonal.
+	_noise_z.seed = 7331
+
+
+## Displace a point horizontally by noise sampled at that point. Height is left
+## alone: terrain height is decided by the tile, and nudging it here would open
+## gaps between the ground and anything standing on it.
+static func perturb(position: Vector3) -> Vector3:
+	_ensure_noise()
+	return Vector3(
+		position.x + _noise_x.get_noise_2d(position.x, position.z) * PERTURB_STRENGTH,
+		position.y,
+		position.z + _noise_z.get_noise_2d(position.x, position.z) * PERTURB_STRENGTH,
+	)
+
+
+## Where a tile centre actually ends up on screen, for placing anything that
+## stands on it.
+static func tile_center(coord: Vector2i, size: float) -> Vector3:
+	var centre := Hex.to_world(coord, size)
+	return perturb(centre)
 
 ## How far an edge vertex moves toward the average of its three tiles. 1.0 is a
 ## full average, which dissolves tile boundaries entirely.
@@ -329,17 +409,22 @@ static func ground_material() -> ShaderMaterial:
 ## Emit one upward-facing triangle. Winding is a -> b -> c; with +Y up and
 ## Godot's counter-clockwise front faces, that order is what points the normal
 ## at the sky rather than at the sea floor.
+##
+## Every vertex is perturbed on the way out. Doing it here rather than at each
+## call site guarantees no vertex escapes un-displaced, which would tear the
+## mesh — and because perturb() depends only on the position handed to it, the
+## three tiles meeting at a corner still land on exactly the same point.
 static func _tri(
 	surface: SurfaceTool,
 	a: Vector3, b: Vector3, c: Vector3,
 	a_color: Color, b_color: Color, c_color: Color
 ) -> void:
 	surface.set_color(a_color)
-	surface.add_vertex(a)
+	surface.add_vertex(perturb(a))
 	surface.set_color(b_color)
-	surface.add_vertex(b)
+	surface.add_vertex(perturb(b))
 	surface.set_color(c_color)
-	surface.add_vertex(c)
+	surface.add_vertex(perturb(c))
 
 
 ## A single translucent sheet at sea level covering every water tile. Drawn flat

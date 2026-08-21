@@ -166,8 +166,11 @@ func _scatter(rng: RandomNumberGenerator, radius: float) -> Vector3:
 	return Vector3(cos(angle) * distance, 0.0, sin(angle) * distance)
 
 
+## Props stand on the *perturbed* ground. The terrain mesh displaces every
+## vertex horizontally, so placing anything at the ideal hex centre leaves it
+## hovering beside the tile it belongs to.
 func _prop_transform(tile: Tile, offset: Vector3, yaw: float, surface: float) -> Transform3D:
-	var origin := Hex.to_world(tile.coord, ArtPalette.HEX_SIZE) + offset
+	var origin := TerrainMesh.perturb(Hex.to_world(tile.coord, ArtPalette.HEX_SIZE) + offset)
 	origin.y = surface
 	return Transform3D(Basis(Vector3.UP, yaw), origin)
 
@@ -359,10 +362,10 @@ func _add_river_edge(surface: SurfaceTool, tile: Tile, direction: int) -> void:
 	var along := (b - a).normalized()
 	var across := along.cross(Vector3.UP).normalized() * 0.09
 
-	var p0 := Vector3(a.x, height, a.z) - across
-	var p1 := Vector3(a.x, height, a.z) + across
-	var p2 := Vector3(b.x, height, b.z) + across
-	var p3 := Vector3(b.x, height, b.z) - across
+	var p0 := TerrainMesh.perturb(Vector3(a.x, height, a.z) - across)
+	var p1 := TerrainMesh.perturb(Vector3(a.x, height, a.z) + across)
+	var p2 := TerrainMesh.perturb(Vector3(b.x, height, b.z) + across)
+	var p3 := TerrainMesh.perturb(Vector3(b.x, height, b.z) - across)
 
 	surface.add_vertex(p0); surface.add_vertex(p1); surface.add_vertex(p2)
 	surface.add_vertex(p0); surface.add_vertex(p2); surface.add_vertex(p3)
@@ -425,10 +428,10 @@ func _add_border_edge(surface: SurfaceTool, tile: Tile, direction: int, colour: 
 	var across := along.cross(Vector3.UP).normalized() * 0.05
 
 	surface.set_color(colour)
-	var p0 := Vector3(a.x, height, a.z) - across
-	var p1 := Vector3(a.x, height, a.z) + across
-	var p2 := Vector3(b.x, height, b.z) + across
-	var p3 := Vector3(b.x, height, b.z) - across
+	var p0 := TerrainMesh.perturb(Vector3(a.x, height, a.z) - across)
+	var p1 := TerrainMesh.perturb(Vector3(a.x, height, a.z) + across)
+	var p2 := TerrainMesh.perturb(Vector3(b.x, height, b.z) + across)
+	var p3 := TerrainMesh.perturb(Vector3(b.x, height, b.z) - across)
 
 	surface.add_vertex(p0); surface.add_vertex(p1); surface.add_vertex(p2)
 	surface.add_vertex(p0); surface.add_vertex(p2); surface.add_vertex(p3)
