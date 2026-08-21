@@ -3,13 +3,13 @@ extends RefCounted
 
 ## Builds a world from a seed.
 ##
-## The pipeline is: elevation -> land/sea -> climate bands -> hills and
-## mountains -> rivers traced down the elevation gradient -> features ->
+## The pipeline is: elevation -> land/sea -> hills and mountains -> erosion ->
+## climate -> biomes -> rivers -> features ->
 ## continents -> resources -> natural wonders -> start positions.
 ##
-## Climate is driven by latitude rather than a second noise field, so the map
-## reads like a world: ice at the poles, tundra below it, a temperate belt, then
-## the desert latitudes around thirty degrees, and rainforest at the equator.
+## Climate is a simulated water cycle rather than a latitude lookup, so the map
+## explains itself: wet windward coasts, dry interiors, and deserts in the lee
+## of mountain ranges. See core/map/climate.gd.
 
 const MAP_SIZES := {
 	&"duel": Vector2i(44, 26),
@@ -36,10 +36,16 @@ func generate(size: StringName = &"standard", options: Dictionary = {}) -> MapMo
 	map = MapModel.new()
 	map.setup(dims.x, dims.y, true)
 
+	# Order matters more than it looks. Relief has to exist before the climate
+	# runs, or the water cycle has no mountains to rain against and produces no
+	# rain shadows; and the climate has to exist before terrain is assigned, or
+	# biomes fall back to latitude stripes. Erosion sits between the two so the
+	# ranges the wind meets are the eroded ones.
 	_generate_elevation()
 	_assign_land_and_sea()
-	_assign_climate()
 	_place_hills_and_mountains()
+	_erode()
+	_assign_climate()
 	_trace_rivers()
 	_place_features()
 	_identify_continents()
@@ -108,6 +114,27 @@ func _assign_land_and_sea() -> void:
 	var index := int(elevations.size() * (1.0 - LAND_FRACTION))
 	var sea_level: float = elevations[clampi(index, 0, elevations.size() - 1)]
 
+	# Rescale elevation so it means something absolute: 0 at the waterline, 1 at
+	# the highest land, negative under the sea.
+	#
+	# Until now this held raw noise, roughly -1.5..1 with the shoreline wherever
+	# the land fraction happened to put it. Every consumer then had to guess a
+	# range, and they guessed differently — the renderer assumed 0..1 and placed
+	# land at (elevation - 0.5), which for a typical coastal tile came out below
+	# the water plane and drew the sea standing above the beach. Normalising once
+	# here means elevation reads the same to the climate model, the renderer and
+	# the AI.
+	var highest := sea_level
+	for value in elevations:
+		highest = maxf(highest, value)
+	var span := maxf(highest - sea_level, 0.0001)
+
+	for tile: Tile in map.tiles.values():
+		tile.elevation = (tile.elevation - sea_level) / span
+
+	sea_level = 0.0
+	_sea_level = sea_level
+
 	for tile: Tile in map.tiles.values():
 		tile.terrain_id = &"grassland" if tile.elevation > sea_level else &"ocean"
 
@@ -158,38 +185,109 @@ func _is_connected_to_ocean(start: Vector2i) -> bool:
 # Climate
 # -------------------------------------------------------------------------
 
+## Moisture for every tile, kept so rivers can start where the rain actually
+## falls rather than at an arbitrary high point.
+var _moisture: Dictionary = {}
+
+## The elevation the shoreline landed on. Kept because "how high is this tile"
+## only means anything relative to the sea, and several later passes need it.
+var _sea_level: float = 0.0
+
+
+## Terrain comes out of the simulated climate rather than straight off the
+## latitude, which is what lets a mountain range put a desert behind it.
+## Mountains keep their own terrain — they are relief, not a biome.
 func _assign_climate() -> void:
-	var moisture := FastNoiseLite.new()
-	moisture.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	moisture.seed = _rng.randi()
-	moisture.frequency = 0.045
+	_moisture = Climate.simulate(map, _rng)
+
+	var jitter := FastNoiseLite.new()
+	jitter.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	jitter.seed = _rng.randi()
+	jitter.frequency = 0.06
+
+	var bands := Climate.moisture_bands(map, _moisture)
 
 	for tile: Tile in map.tiles.values():
-		if tile.is_water():
+		if tile.is_water() or tile.terrain_id == &"mountains":
 			continue
-		var off := MapModel.axial_to_offset(tile.coord)
-		var lat := absf(_latitude(off.y))
-		var wet := moisture.get_noise_2d(off.x, off.y) * 0.5 + 0.5
+		var temperature := Climate.temperature_of(map, tile, jitter)
+		tile.terrain_id = Climate.biome_for(
+			temperature, float(_moisture.get(tile.coord, 0.0)), bands
+		)
 
-		if lat > 0.88:
-			tile.terrain_id = &"snow"
-		elif lat > 0.72:
-			tile.terrain_id = &"tundra"
-		elif lat > 0.42:
-			# Temperate belt: grassland where it is wet, plains where it is not.
-			tile.terrain_id = &"grassland" if wet > 0.5 else &"plains"
-		elif lat > 0.22:
-			# The desert latitudes — dry unless local moisture rescues them.
-			if wet < 0.42:
-				tile.terrain_id = &"desert"
-			else:
-				tile.terrain_id = &"plains" if wet < 0.62 else &"grassland"
-		else:
-			# Tropics: wet and green, with pockets of desert on the lee side.
-			if wet < 0.3:
-				tile.terrain_id = &"desert"
-			else:
-				tile.terrain_id = &"grassland" if wet > 0.45 else &"plains"
+
+# -------------------------------------------------------------------------
+# Erosion
+# -------------------------------------------------------------------------
+
+## Fraction of erodible cells to wear away. 0 disables erosion entirely.
+const EROSION_PERCENTAGE := 55
+
+## Elevation gap that counts as a cliff, and so as erodible.
+const CLIFF_GAP := 0.16
+
+
+## Knock the sharp edges off the terrain by moving material downhill.
+##
+## Raw noise produces cliffs everywhere: isolated spikes and sheer drops that
+## look like nothing on Earth. Erosion, from part 24 of Catlike Coding's series,
+## finds every cell standing well above a neighbour and moves a slice of it into
+## that neighbour — so total landmass is conserved and the shape is redistributed
+## rather than flattened. Coastlines come out less jagged and ranges gain
+## foothills instead of ending in a wall.
+func _erode() -> void:
+	if EROSION_PERCENTAGE <= 0:
+		return
+
+	var erodible: Array[Tile] = []
+	for tile: Tile in map.tiles.values():
+		if _is_erodible(tile):
+			erodible.append(tile)
+
+	var target_count := int(erodible.size() * (100 - EROSION_PERCENTAGE) / 100.0)
+	# Erosion can create new erodible cells as it goes, so the loop is bounded
+	# rather than run to exhaustion.
+	var guard := erodible.size() * 4
+
+	while erodible.size() > target_count and guard > 0:
+		guard -= 1
+		var index := _rng.randi_range(0, erodible.size() - 1)
+		var tile := erodible[index]
+		var target := _erosion_target(tile)
+		if target == null:
+			erodible.remove_at(index)
+			continue
+
+		var moved := (tile.elevation - target.elevation) * 0.35
+		tile.elevation -= moved
+		target.elevation += moved
+
+		if not _is_erodible(tile):
+			erodible.remove_at(index)
+		# The receiving cell may now tower over one of *its* neighbours.
+		if _is_erodible(target) and not erodible.has(target):
+			erodible.append(target)
+
+
+func _is_erodible(tile: Tile) -> bool:
+	if tile.is_water():
+		return false
+	for neighbour: Tile in map.neighbors(tile.coord):
+		if neighbour.is_land() and tile.elevation - neighbour.elevation > CLIFF_GAP:
+			return true
+	return false
+
+
+## A random neighbour at the foot of the cliff, so material lands somewhere
+## plausible instead of always the same way.
+func _erosion_target(tile: Tile) -> Tile:
+	var candidates: Array[Tile] = []
+	for neighbour: Tile in map.neighbors(tile.coord):
+		if neighbour.is_land() and tile.elevation - neighbour.elevation > CLIFF_GAP:
+			candidates.append(neighbour)
+	if candidates.is_empty():
+		return null
+	return candidates[_rng.randi_range(0, candidates.size() - 1)]
 
 
 func _place_hills_and_mountains() -> void:
@@ -223,15 +321,40 @@ func _place_hills_and_mountains() -> void:
 ## marking the edge they cross. Because they run along edges rather than
 ## occupying tiles, a river tile keeps its own yields and gains fresh water,
 ## +1 Appeal, and Commercial Hub adjacency.
+## Rivers begin where the rain does.
+##
+## Picking the highest tiles gives every range a river regardless of whether any
+## water falls there, which is how you end up with streams pouring out of a
+## desert massif. Catlike's series scores an origin by moisture times relative
+## elevation, so a source needs both the rainfall to feed it and the height to
+## run downhill from — and the climate simulation above is what makes that score
+## mean something.
 func _trace_rivers() -> void:
 	var candidates: Array[Tile] = []
+	var fitness: Dictionary = {}
+
+	# Elevation is absolute 0..1, most of which is under water, so a source is
+	# scored on how high it stands above the shoreline rather than above zero.
+	var sea_level := _sea_level
+	var highest := sea_level
 	for tile: Tile in map.tiles.values():
-		if tile.is_land() and (tile.terrain_id == &"mountains" or tile.is_hills):
-			candidates.append(tile)
+		if tile.is_land():
+			highest = maxf(highest, tile.elevation)
+	var span := maxf(highest - sea_level, 0.001)
+
+	for tile: Tile in map.tiles.values():
+		if not tile.is_land() or tile.terrain_id == &"lake":
+			continue
+		var moisture := float(_moisture.get(tile.coord, 0.0))
+		var relief := clampf((tile.elevation - sea_level) / span, 0.0, 1.0)
+		candidates.append(tile)
+		fitness[tile.coord] = moisture * relief
+
 	if candidates.is_empty():
 		return
 
-	candidates.sort_custom(func(a: Tile, b: Tile) -> bool: return a.elevation > b.elevation)
+	candidates.sort_custom(func(a: Tile, b: Tile) -> bool:
+		return float(fitness[a.coord]) > float(fitness[b.coord]))
 
 	var target := maxi(4, int(map.width * map.height * 0.0035))
 	var placed := 0

@@ -24,6 +24,13 @@ func _ready() -> void:
 		get_tree().quit(0 if ok else 1)
 		return
 
+	if args.has("--shot"):
+		var shot: Node = preload("res://tools/screenshot_runner.gd").new()
+		add_child(shot)
+		var saved: bool = await shot.run(_parse_options(args))
+		get_tree().quit(0 if saved else 1)
+		return
+
 	_start_interactive()
 
 
