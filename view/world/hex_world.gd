@@ -326,16 +326,38 @@ func refresh_rivers() -> void:
 		return
 
 	surface.generate_normals()
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.30, 0.62, 0.92)
-	material.roughness = 0.25
-	material.metallic = 0.1
-	surface.set_material(material)
+	surface.set_material(_river_material())
 
 	_rivers = MeshInstance3D.new()
 	_rivers.name = "Rivers"
 	_rivers.mesh = surface.commit()
+	_rivers.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_rivers)
+
+
+## Rivers animate entirely in the shader, so the mesh is built once and never
+## touched again — the terrain stays static while the water moves.
+static var _river_shader_material: ShaderMaterial = null
+
+static func _river_material() -> ShaderMaterial:
+	if _river_shader_material != null:
+		return _river_shader_material
+
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	noise.frequency = 0.05
+	noise.fractal_octaves = 3
+
+	var texture := NoiseTexture2D.new()
+	texture.noise = noise
+	texture.width = 256
+	texture.height = 256
+	texture.seamless = true
+
+	_river_shader_material = ShaderMaterial.new()
+	_river_shader_material.shader = load("res://view/world/river.gdshader")
+	_river_shader_material.set_shader_parameter("flow_noise", texture)
+	return _river_shader_material
 
 
 ## Deterministic tiebreak so a shared edge is drawn by exactly one of its tiles.
@@ -345,9 +367,16 @@ func _edge_owner(a: Vector2i, b: Vector2i) -> Vector2i:
 	return a if a.y < b.y else b
 
 
+## Half-width of the river ribbon, in world units.
+const RIVER_HALF_WIDTH := 0.16
+## How far the water sits below the tile surface, so it reads as a cut channel
+## rather than a painted stripe. Catlike drops the stream bed well under the
+## cell for the same reason.
+const RIVER_DEPTH := 0.06
+
+
 func _add_river_edge(surface: SurfaceTool, tile: Tile, direction: int) -> void:
 	var centre := Hex.to_world(tile.coord, ArtPalette.HEX_SIZE)
-	var height := TerrainMesh.surface_height(tile) + 0.02
 
 	# The two corners bounding edge `direction` on a flat-top hex sit at
 	# 60-degree steps, offset 30 degrees from the direction's own angle.
@@ -359,16 +388,37 @@ func _add_river_edge(surface: SurfaceTool, tile: Tile, direction: int) -> void:
 		cos(angle + PI / 6.0), 0.0, sin(angle + PI / 6.0)
 	) * ArtPalette.HEX_SIZE
 
-	var along := (b - a).normalized()
-	var across := along.cross(Vector3.UP).normalized() * 0.09
+	# Sit the water on the ground the edge actually has, which is the welded
+	# corner height rather than either tile's centre. Using a centre height
+	# leaves the ribbon buried wherever the terrain rises between tile middles —
+	# a mountain's crags do exactly that, and swallowed the rivers whole.
+	var fallback := TerrainMesh.surface_height(tile)
+	var height_a := TerrainMesh.corner_height_at(a, fallback) - RIVER_DEPTH
+	var height_b := TerrainMesh.corner_height_at(b, fallback) - RIVER_DEPTH
 
-	var p0 := TerrainMesh.perturb(Vector3(a.x, height, a.z) - across)
-	var p1 := TerrainMesh.perturb(Vector3(a.x, height, a.z) + across)
-	var p2 := TerrainMesh.perturb(Vector3(b.x, height, b.z) + across)
-	var p3 := TerrainMesh.perturb(Vector3(b.x, height, b.z) - across)
+	var flat_a := Vector3(a.x, height_a, a.z)
+	var flat_b := Vector3(b.x, height_b, b.z)
+	var along := (Vector3(b.x, 0.0, b.z) - Vector3(a.x, 0.0, a.z)).normalized()
+	var across := along.cross(Vector3.UP).normalized() * RIVER_HALF_WIDTH
 
-	surface.add_vertex(p0); surface.add_vertex(p1); surface.add_vertex(p2)
-	surface.add_vertex(p0); surface.add_vertex(p2); surface.add_vertex(p3)
+	var p0 := TerrainMesh.perturb(flat_a - across)
+	var p1 := TerrainMesh.perturb(flat_a + across)
+	var p2 := TerrainMesh.perturb(flat_b + across)
+	var p3 := TerrainMesh.perturb(flat_b - across)
+
+	# UV: X runs bank to bank and drives the pale edge shading, Y runs along the
+	# ribbon and is what the shader scrolls to make the water flow.
+	_river_vertex(surface, p0, Vector2(0.0, 0.0))
+	_river_vertex(surface, p1, Vector2(1.0, 0.0))
+	_river_vertex(surface, p2, Vector2(1.0, 1.0))
+	_river_vertex(surface, p0, Vector2(0.0, 0.0))
+	_river_vertex(surface, p2, Vector2(1.0, 1.0))
+	_river_vertex(surface, p3, Vector2(0.0, 1.0))
+
+
+func _river_vertex(surface: SurfaceTool, position: Vector3, uv: Vector2) -> void:
+	surface.set_uv(uv)
+	surface.add_vertex(position)
 
 
 ## Territory borders, drawn as a coloured strip along every edge where ownership

@@ -273,6 +273,22 @@ static func _key(position: Vector3) -> Vector2i:
 	return Vector2i(roundi(position.x * WELD), roundi(position.z * WELD))
 
 
+## The welded corner heights from the last build_land, keyed the same way.
+##
+## Anything that has to sit exactly on a tile *edge* — rivers above all — needs
+## the height the ground actually ended up at there, which is the average over
+## the three tiles meeting at that corner. Using the tile centre's height
+## instead leaves a river buried inside a mountain whose crags rise well above
+## its base.
+static var corner_heights: Dictionary = {}
+
+
+## Ground height at a corner, or `fallback` if that corner is not on the map.
+static func corner_height_at(position: Vector3, fallback: float) -> float:
+	var value: Variant = corner_heights.get(_key(position))
+	return float(value) if value != null else fallback
+
+
 ## Build the land surface for every non-water tile.
 static func build_land(map: MapModel, size: float) -> ArrayMesh:
 	var offsets := corner_offsets(size)
@@ -291,6 +307,10 @@ static func build_land(map: MapModel, size: float) -> ArrayMesh:
 			corner_height[key] = float(corner_height.get(key, 0.0)) + height
 			corner_color[key] = (corner_color.get(key, Color(0, 0, 0, 0)) as Color) + colour
 			corner_count[key] = int(corner_count.get(key, 0)) + 1
+
+	corner_heights.clear()
+	for key: Variant in corner_height:
+		corner_heights[key] = float(corner_height[key]) / float(corner_count[key])
 
 	# Pass two: each tile is a flat core plus a blend ring.
 	#

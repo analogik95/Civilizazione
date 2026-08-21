@@ -99,6 +99,17 @@ func _print_terrain_census() -> void:
 	for name: Variant in features:
 		print("    feature %-10s %5d" % [name, features[name]])
 
+	var river_tiles := 0
+	var river_edges := 0
+	for tile: Tile in Game.map.all_tiles():
+		if tile.river_edges == 0:
+			continue
+		river_tiles += 1
+		for d in Hex.DIRECTION_COUNT:
+			if tile.has_river_on(d):
+				river_edges += 1
+	print("    river tiles  %5d, river edges %5d" % [river_tiles, river_edges])
+
 
 ## Aim at the busiest part of the map: the largest city if any has been founded,
 ## otherwise wherever the most units are standing. Framing the geometric centre
@@ -106,6 +117,24 @@ func _print_terrain_census() -> void:
 func _focus_point() -> Vector3:
 	# focus=<terrain> aims at the densest cluster of that terrain, which is how
 	# you actually check whether mountains or ice render correctly.
+	# focus=river aims at the densest river network on the map.
+	if _focus_terrain == &"river":
+		var best_river := Vector2i.ZERO
+		var best_edges := 0
+		for tile: Tile in Game.map.all_tiles():
+			if tile.river_edges == 0:
+				continue
+			var edges := 0
+			for other: Tile in Game.map.tiles_within(tile.coord, 3):
+				for d in Hex.DIRECTION_COUNT:
+					if other.has_river_on(d):
+						edges += 1
+			if edges > best_edges:
+				best_edges = edges
+				best_river = tile.coord
+		if best_edges > 0:
+			return Hex.to_world(best_river, ArtPalette.HEX_SIZE)
+
 	if _focus_terrain != &"":
 		var best := Vector2i.ZERO
 		var best_score := -1
