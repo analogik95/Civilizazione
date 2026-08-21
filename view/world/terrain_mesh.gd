@@ -447,13 +447,74 @@ static func _tri(
 	surface.add_vertex(perturb(c))
 
 
-## A single translucent sheet at sea level covering every water tile. Drawn flat
-## rather than blended into the land so the coastline reads as a definite edge.
+## How many tiles of open water separate each water tile from the nearest land.
+##
+## This is the one thing the water shader cannot work out for itself, so it is
+## measured here and baked into the mesh — Catlike's series encodes the same
+## quantity into shore-water UVs. A plain breadth-first search from every coastal
+## tile outward is enough; the map is small and this runs once per generation.
+static func shore_distances(map: MapModel) -> Dictionary:
+	var distance: Dictionary = {}
+	var frontier: Array[Vector2i] = []
+
+	for tile: Tile in map.all_tiles():
+		if not tile.is_water():
+			continue
+		for neighbour: Tile in map.neighbors(tile.coord):
+			if neighbour.is_land():
+				distance[tile.coord] = 0.0
+				frontier.append(tile.coord)
+				break
+
+	var head := 0
+	while head < frontier.size():
+		var coord := frontier[head]
+		head += 1
+		var next := float(distance[coord]) + 1.0
+		for neighbour: Tile in map.neighbors(coord):
+			if not neighbour.is_water() or distance.has(neighbour.coord):
+				continue
+			distance[neighbour.coord] = next
+			frontier.append(neighbour.coord)
+
+	return distance
+
+
+## Water beyond this many tiles from land is open sea and needs no shore detail.
+const OPEN_SEA_DISTANCE := 6.0
+
+
+## A single sheet at sea level covering every water tile.
+##
+## Drawn flat rather than blended into the land, so the coastline stays a
+## definite edge — but each vertex carries its distance from shore in UV.y, and
+## its world position in UV2, which is what lets the shader break foam against
+## the coast and animate the surface without the pattern swimming as the camera
+## moves.
 static func build_water(map: MapModel, size: float) -> ArrayMesh:
 	var offsets := corner_offsets(size)
+	var distance := shore_distances(map)
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var emitted := 0
+
+	# Shore distance has to vary *within* a tile, not just between tiles. Held
+	# constant per tile there is no gradient for the surf to break against and
+	# the whole first ring of water renders as solid foam. So corners are
+	# averaged over the tiles that touch them, with land counted as -1: a corner
+	# against the coast lands below zero, the tile centre sits at its own
+	# distance, and each shore tile gets a ramp from beach to open water.
+	var corner_shore: Dictionary = {}
+	var corner_total: Dictionary = {}
+	for tile: Tile in map.all_tiles():
+		var value := -1.0
+		if tile.is_water():
+			value = minf(float(distance.get(tile.coord, OPEN_SEA_DISTANCE)), OPEN_SEA_DISTANCE)
+		var tile_centre := Hex.to_world(tile.coord, size)
+		for i in 6:
+			var key := _key(tile_centre + offsets[i])
+			corner_shore[key] = float(corner_shore.get(key, 0.0)) + value
+			corner_total[key] = int(corner_total.get(key, 0)) + 1
 
 	for tile: Tile in map.all_tiles():
 		if not tile.is_water():
@@ -462,39 +523,61 @@ static func build_water(map: MapModel, size: float) -> ArrayMesh:
 		# Coast sits fractionally higher than deep ocean, which combined with the
 		# colour difference gives the shallows a visible band.
 		var level: float = -0.06 if tile.terrain_id != &"ocean" else -0.09
-		var colour: Color = TERRAIN_COLOR.get(tile.terrain_id, TERRAIN_COLOR[&"ocean"])
-		colour.a = 0.86
+		var colour := Color.WHITE
+		var shore: float = minf(float(distance.get(tile.coord, OPEN_SEA_DISTANCE)), OPEN_SEA_DISTANCE)
 
 		# Ice is a feature sitting on polar water. Without this it is skipped
 		# entirely — the land pass ignores water tiles — and the poles render as
-		# open ocean. It floats just above the surface and is opaque.
-		if tile.feature_id == &"ice":
+		# open ocean. It floats just above the surface, is opaque, and is pushed
+		# out past the foam range so no surf breaks through it.
+		var is_ice := tile.feature_id == &"ice"
+		if is_ice:
 			colour = ICE_COLOR
 			level += 0.05
+			shore = OPEN_SEA_DISTANCE
 
 		for i in 6:
+			var j := (i + 1) % 6
 			var a := centre + offsets[i]
-			var b := centre + offsets[(i + 1) % 6]
-			_tri(surface,
-				Vector3(centre.x, level, centre.z),
-				Vector3(a.x, level, a.z),
-				Vector3(b.x, level, b.z),
-				colour, colour, colour)
+			var b := centre + offsets[j]
+			var shore_a := shore if is_ice else _corner_shore(corner_shore, corner_total, a)
+			var shore_b := shore if is_ice else _corner_shore(corner_shore, corner_total, b)
+			_water_tri(surface,
+				Vector3(centre.x, level, centre.z), Vector3(a.x, level, a.z), Vector3(b.x, level, b.z),
+				colour, shore, shore_a, shore_b, is_ice)
 			emitted += 1
 
 	if emitted == 0:
 		return null
 
 	surface.generate_normals()
-
-	var material := StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo = true
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(1, 1, 1, 0.92)
-	material.roughness = 0.12
-	material.metallic = 0.25
-	surface.set_material(material)
 	return surface.commit()
+
+
+static func _corner_shore(sums: Dictionary, counts: Dictionary, position: Vector3) -> float:
+	var key := _key(position)
+	var total: Variant = counts.get(key)
+	if total == null or int(total) == 0:
+		return 0.0
+	return float(sums[key]) / float(total)
+
+
+## Like _tri, but carrying the per-vertex shore distance and world position the
+## water shader needs. Vertex colour is reused as an ice mask: the shader leaves
+## any vertex flagged as ice alone rather than running surf over it.
+static func _water_tri(
+	surface: SurfaceTool,
+	a: Vector3, b: Vector3, c: Vector3,
+	colour: Color, shore_a: float, shore_b: float, shore_c: float, is_ice: bool
+) -> void:
+	var vertices: Array[Vector3] = [a, b, c]
+	var shores: Array[float] = [shore_a, shore_b, shore_c]
+	for i in 3:
+		var placed := perturb(vertices[i])
+		surface.set_color(Color(colour.r, colour.g, colour.b, 1.0 if is_ice else 0.0))
+		surface.set_uv(Vector2(0.0, shores[i]))
+		surface.set_uv2(Vector2(placed.x, placed.z))
+		surface.add_vertex(placed)
 
 
 ## Surface height at a tile centre, for placing props and units.

@@ -99,6 +99,7 @@ func _build_ground() -> void:
 		_water = MeshInstance3D.new()
 		_water.name = "Water"
 		_water.mesh = water
+		_water.material_override = _water_material()
 		_water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(_water)
 
@@ -333,6 +334,32 @@ func refresh_rivers() -> void:
 	_rivers.mesh = surface.commit()
 	_rivers.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_rivers)
+
+
+## The sea animates in the shader too, reading the shore distance baked into the
+## mesh by TerrainMesh.build_water.
+static var _water_shader_material: ShaderMaterial = null
+
+static func _water_material() -> ShaderMaterial:
+	if _water_shader_material != null:
+		return _water_shader_material
+	_water_shader_material = ShaderMaterial.new()
+	_water_shader_material.shader = load("res://view/world/water.gdshader")
+	_water_shader_material.set_shader_parameter("wave_noise", _wave_texture())
+	return _water_shader_material
+
+
+static func _wave_texture() -> NoiseTexture2D:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	noise.frequency = 0.03
+	noise.fractal_octaves = 3
+	var texture := NoiseTexture2D.new()
+	texture.noise = noise
+	texture.width = 256
+	texture.height = 256
+	texture.seamless = true
+	return texture
 
 
 ## Rivers animate entirely in the shader, so the mesh is built once and never
