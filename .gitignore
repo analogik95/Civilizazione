@@ -78,3 +78,6 @@ build_out/
 # Blender
 *.blend1
 *.blend2
+# Toolchain and asset caches — fetched by tools/, never committed.
+.toolchain/
+.assetcache/
