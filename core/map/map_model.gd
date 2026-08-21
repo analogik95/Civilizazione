@@ -94,13 +94,16 @@ func neighbor_in(coord: Vector2i, direction: int) -> Tile:
 
 ## Distance accounting for east-west wrap, so two tiles either side of the
 ## seam are correctly adjacent rather than a map-width apart.
+##
+## Called several thousand times per turn from pathfinding and AI target
+## selection, so it avoids allocating and only pays for the wrap check when the
+## two tiles are far enough apart for wrapping to matter.
 func distance(a: Vector2i, b: Vector2i) -> int:
 	var direct := Hex.distance(a, b)
-	if not wrap_x:
+	if not wrap_x or direct * 2 <= width:
 		return direct
-	var shifted := b + offset_to_axial(width, 0) - offset_to_axial(0, 0)
-	var wrapped := mini(Hex.distance(a, shifted), Hex.distance(a, b - (shifted - b)))
-	return mini(direct, wrapped)
+	var shift := offset_to_axial(width, 0)
+	return mini(direct, mini(Hex.distance(a, b + shift), Hex.distance(a, b - shift)))
 
 
 func tiles_within(center: Vector2i, radius: int) -> Array[Tile]:
