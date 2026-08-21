@@ -37,12 +37,14 @@ const CORE_RADIUS := 0.58
 const EDGE_BLEND := 0.62
 
 ## Height in world units for each terrain, before per-tile elevation noise.
-## A tile is two units across, so a mountain at 1.9 stands about as tall as a
-## tile is wide — dramatic in silhouette without blocking the tiles behind it.
+##
+## Mountains stand well above everything else and are impassable, so they are
+## allowed to dominate. Their jagged detail and snow line come from the rock
+## section below; this is just the base height the crags are built on.
 const TERRAIN_HEIGHT := {
 	&"ocean": -0.50, &"coast": -0.20, &"lake": -0.16,
 	&"grassland": 0.0, &"plains": 0.02, &"desert": 0.0,
-	&"tundra": 0.04, &"snow": 0.08, &"mountains": 1.90,
+	&"tundra": 0.04, &"snow": 0.08, &"mountains": 1.55,
 }
 
 const HILL_HEIGHT := 0.62
@@ -67,10 +69,13 @@ const TERRAIN_COLOR := {
 	&"lake": Color(0.22, 0.54, 0.74),
 }
 
-## Tile edges are darkened slightly, which draws the hex grid without a separate
-## overlay pass. Civ 6 keeps a faint tile boundary visible for the same reason:
-## the player is choosing which tile to work, and needs to see where one ends.
-const EDGE_SHADE := 0.90
+## Civilization VI draws no hex grid on the ground at all. The terrain is one
+## organic field, and the grid is implied by borders, districts and
+## improvements — by what is *on* the land rather than by the land itself.
+## Darkening tile edges here was making every hex read as a discrete patch, so
+## edges are left unshaded and the grid is drawn as a toggleable overlay
+## instead, the way the real game does it.
+const EDGE_SHADE := 1.0
 
 ## Features recolour the ground under them, the way Civ 6 darkens a Woods tile
 ## rather than only planting trees on it.
@@ -84,6 +89,62 @@ const FEATURE_COLOR := {
 }
 
 const MOUNTAIN_COLOR_TOP := Color(0.94, 0.95, 0.97)
+
+# -------------------------------------------------------------------------
+# Rock
+# -------------------------------------------------------------------------
+#
+# Mountains are part of the terrain mesh, not models standing on it. That is
+# what lets neighbouring mountain hexes merge: they share corner vertices, so
+# the corner-averaging in build_land welds their ridgelines into one unbroken
+# wall the way Civ 6's does. A per-tile prop cannot do that — every peak stays
+# its own island no matter how it is sculpted.
+#
+# The jag terms below are what keep it from being a smooth dome. Each is a
+# deterministic offset per (tile, vertex), so the crags are stable across
+# rebuilds and two tiles always agree about the corner they share.
+
+## Extra height on the peak vertex, in world units.
+const PEAK_JAG := 0.95
+## How far the peak slides off the tile centre, in tile radii.
+const PEAK_DRIFT := 0.34
+## Height variation around the inner ring, which is what facets the sides.
+const CORE_JAG := 0.68
+
+## Grey-brown cliff, snow only on the caps.
+const ROCK_LOW := Color(0.26, 0.23, 0.21)
+const ROCK_MID := Color(0.40, 0.37, 0.34)
+const ROCK_HIGH := Color(0.54, 0.52, 0.51)
+const ROCK_SNOW := Color(0.92, 0.94, 0.96)
+
+## World heights the rock ramp is keyed to. Snow starts high so a mountain is
+## mostly cliff with a cap, not a white cone.
+const ROCK_BASE_Y := 0.60
+const ROCK_SNOW_Y := 2.25
+
+
+## Cliff colour at a world height. Used for every vertex of a rocky tile, so the
+## snow line follows the actual geometry rather than the tile it belongs to —
+## which is why a ridge's snow runs continuously across tile boundaries.
+static func rock_color_at(y: float) -> Color:
+	var t := clampf((y - ROCK_BASE_Y) / maxf(ROCK_SNOW_Y - ROCK_BASE_Y, 0.001), 0.0, 1.0)
+	if t < 0.45:
+		return ROCK_LOW.lerp(ROCK_MID, t / 0.45)
+	if t < 0.86:
+		return ROCK_MID.lerp(ROCK_HIGH, (t - 0.45) / 0.41)
+	return ROCK_HIGH.lerp(ROCK_SNOW, (t - 0.86) / 0.14)
+
+
+static func is_rocky(tile: Tile) -> bool:
+	return tile.terrain_id == &"mountains"
+
+
+## Deterministic per-vertex offset in -1..1. Hashing the coordinate with the
+## vertex index means the same tile produces the same crag every rebuild, and
+## adjacent tiles never disagree about a shared corner.
+static func _jag(coord: Vector2i, index: int) -> float:
+	var h := hash(Vector3i(coord.x, coord.y, index))
+	return float(h % 2000) / 1000.0 - 1.0
 
 ## Pack ice on polar water. Opaque, and slightly blue so it separates from the
 ## snow terrain it usually borders.
@@ -168,17 +229,36 @@ static func build_land(map: MapModel, size: float) -> ArrayMesh:
 		var centre := Hex.to_world(tile.coord, size)
 		var height := height_of(tile)
 		var colour := color_of(tile)
-		var middle := Vector3(centre.x, height, centre.z)
+		var rocky := is_rocky(tile)
+
+		# Mountains are jagged rather than flat-topped, and their peak is offset
+		# from the tile centre so a range does not read as a row of identical
+		# cones sitting on their own hexes.
+		var apex := height
+		var apex_offset := Vector3.ZERO
+		if rocky:
+			apex += _jag(tile.coord, 0) * PEAK_JAG
+			apex_offset = Vector3(_jag(tile.coord, 7), 0.0, _jag(tile.coord, 8)) * PEAK_DRIFT * size
+
+		var middle := Vector3(centre.x + apex_offset.x, apex, centre.z + apex_offset.z)
+		var middle_color := colour if not rocky else rock_color_at(apex)
 
 		for i in 6:
 			var j := (i + 1) % 6
-			var inner_a := centre + offsets[i] * CORE_RADIUS
-			inner_a.y = height
-			var inner_b := centre + offsets[j] * CORE_RADIUS
-			inner_b.y = height
 
-			# Flat core.
-			_tri(surface, middle, inner_a, inner_b, colour, colour, colour)
+			# On rocky tiles the inner ring varies per corner, which is what turns
+			# a smooth dome into a faceted crag. On everything else it stays flat,
+			# so ordinary terrain keeps its readable tile core.
+			var inner_a := centre + offsets[i] * CORE_RADIUS
+			inner_a.y = height + (_jag(tile.coord, i + 1) * CORE_JAG if rocky else 0.0)
+			var inner_b := centre + offsets[j] * CORE_RADIUS
+			inner_b.y = height + (_jag(tile.coord, j + 1) * CORE_JAG if rocky else 0.0)
+
+			var inner_a_color := colour if not rocky else rock_color_at(inner_a.y)
+			var inner_b_color := colour if not rocky else rock_color_at(inner_b.y)
+
+			# Core.
+			_tri(surface, middle, inner_a, inner_b, middle_color, inner_a_color, inner_b_color)
 
 			var a_key := _key(centre + offsets[i])
 			var b_key := _key(centre + offsets[j])
@@ -190,29 +270,60 @@ static func build_land(map: MapModel, size: float) -> ArrayMesh:
 			# Corners average all three touching tiles, which washes the tile's
 			# own identity out of its edge. Pulling the blend back toward this
 			# tile keeps the transition soft without dissolving the boundary.
-			var a_color := colour.lerp(
-				(corner_color[a_key] as Color) / float(corner_count[a_key]), EDGE_BLEND
-			).darkened(1.0 - EDGE_SHADE)
-			var b_color := colour.lerp(
-				(corner_color[b_key] as Color) / float(corner_count[b_key]), EDGE_BLEND
-			).darkened(1.0 - EDGE_SHADE)
+			#
+			# On rock this averaging is the whole point: it is what makes two
+			# adjacent mountain hexes share a corner height and flow into one
+			# unbroken ridge, instead of standing as two separate peaks.
+			var a_color: Color
+			var b_color: Color
+			if rocky:
+				a_color = rock_color_at(outer_a.y)
+				b_color = rock_color_at(outer_b.y)
+			else:
+				a_color = colour.lerp(
+					(corner_color[a_key] as Color) / float(corner_count[a_key]), EDGE_BLEND
+				).darkened(1.0 - EDGE_SHADE)
+				b_color = colour.lerp(
+					(corner_color[b_key] as Color) / float(corner_count[b_key]), EDGE_BLEND
+				).darkened(1.0 - EDGE_SHADE)
 
 			# Blend ring, as two triangles.
-			_tri(surface, inner_a, outer_a, outer_b, colour, a_color, b_color)
-			_tri(surface, inner_a, outer_b, inner_b, colour, b_color, colour)
+			_tri(surface, inner_a, outer_a, outer_b, inner_a_color, a_color, b_color)
+			_tri(surface, inner_a, outer_b, inner_b, inner_a_color, b_color, inner_b_color)
 			emitted += 3
 
 	if emitted == 0:
 		return null
 
 	surface.generate_normals()
-
-	var material := StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo = true
-	material.roughness = 0.94
-	material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
-	surface.set_material(material)
+	surface.set_material(ground_material())
 	return surface.commit()
+
+
+## The ground material: vertex colour for the biome, world-space noise on top to
+## break up the tiles. Built once and shared.
+static var _ground_material: ShaderMaterial = null
+
+static func ground_material() -> ShaderMaterial:
+	if _ground_material != null:
+		return _ground_material
+
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	noise.frequency = 0.012
+	noise.fractal_octaves = 4
+
+	var texture := NoiseTexture2D.new()
+	texture.noise = noise
+	texture.width = 512
+	texture.height = 512
+	texture.seamless = true
+	texture.generate_mipmaps = true
+
+	_ground_material = ShaderMaterial.new()
+	_ground_material.shader = load("res://view/world/terrain.gdshader")
+	_ground_material.set_shader_parameter("noise_texture", texture)
+	return _ground_material
 
 
 ## Emit one upward-facing triangle. Winding is a -> b -> c; with +Y up and

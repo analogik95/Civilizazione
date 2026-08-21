@@ -91,11 +91,11 @@ const HILL_TINTS := {
 const FEATURE_PROPS := {
 	&"woods": {
 		"models": ["tree_oak", "tree_default", "tree_tall", "tree_oak_dark"],
-		"count": 4, "scale": 0.52, "jitter": 0.46,
+		"count": 7, "scale": 0.60, "jitter": 0.52,
 	},
 	&"rainforest": {
 		"models": ["tree_palm_tall", "tree_palm_short", "tree_palm_bend", "bush_large"],
-		"count": 4, "scale": 0.60, "jitter": 0.46,
+		"count": 6, "scale": 0.62, "jitter": 0.52,
 	},
 	&"marsh": {
 		"models": ["bush", "grass_tuft", "mushroom"],
@@ -127,6 +127,37 @@ const FEATURE_PROPS := {
 ## list so a Tundra Woods tile does not look like a Grassland one.
 const COLD_WOODS := ["tree_pine_a", "tree_pine_b", "tree_pine_small"]
 const COLD_TERRAIN := [&"tundra", &"snow"]
+
+
+# -------------------------------------------------------------------------
+# Sculpted landforms
+# -------------------------------------------------------------------------
+
+## Mountains, hills and shoreline rock are Blender-authored (see
+## tools/blender/build_terrain_props.py) rather than raised terrain hexes.
+##
+## Raising the ground makes a mountain the shape of the tile it stands on,
+## which is exactly the hexagonal chess-piece look Civ 6 does not have. Its
+## mountains are sculpted rock with irregular ridges and snow caps, sitting on
+## ground that stays walkable. Several variants each, picked by coordinate, so
+## a range does not read as one mesh stamped in a row.
+const MOUNTAIN_MODELS := ["mtn_peak_a", "mtn_peak_b", "mtn_peak_c", "mtn_ridge_a", "mtn_ridge_b"]
+const HILL_MODELS := ["hill_a", "hill_b"]
+const SHORE_ROCK_MODELS := ["rock_shore_a", "rock_shore_b"]
+
+const MOUNTAIN_SCALE := 1.95
+const HILL_SCALE := 1.55
+const SHORE_ROCK_SCALE := 0.42
+
+## Chance a coastal land tile grows a rock formation.
+const SHORE_ROCK_CHANCE := 0.34
+
+
+## Deterministic variant choice — the same tile must pick the same model every
+## rebuild or the mountains rearrange themselves whenever anything redraws.
+static func variant(models: Array, coord: Vector2i, salt: int = 0) -> String:
+	var index := absi(hash(Vector2i(coord.x, coord.y)) ^ salt) % models.size()
+	return models[index]
 
 
 # -------------------------------------------------------------------------

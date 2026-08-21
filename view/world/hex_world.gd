@@ -114,11 +114,26 @@ func _bucket_props(tile: Tile, buckets: Dictionary) -> void:
 	rng.seed = hash(tile.coord) ^ PROP_SEED
 	var surface := TerrainMesh.surface_height(tile)
 
+	# Mountains are terrain, not props — see TerrainMesh's rock section. Nothing
+	# else may stand on them.
+	if tile.terrain_id == &"mountains":
+		return
+
 	# A district replaces the tile's natural dressing entirely.
 	if tile.has_district():
 		_add_prop(buckets, "districts", ArtPalette.district_model(tile.district_id),
 			tile, _prop_transform(tile, Vector3.ZERO, 0.0, surface), ArtPalette.DISTRICT_SCALE)
 		return
+
+	# Rock formations where land meets sea, as in the reference shots — a bare
+	# colour change at the waterline reads as a painted edge, not a coastline.
+	# Land only: is_coastal is true for the water side of the shore as well, and
+	# rocks scattered across open sea look like debris.
+	if tile.is_land() and map.is_coastal(tile.coord) and rng.randf() < ArtPalette.SHORE_ROCK_CHANCE:
+		_add_prop(buckets, "terrain",
+			ArtPalette.variant(ArtPalette.SHORE_ROCK_MODELS, tile.coord, 13), tile,
+			_prop_transform(tile, _scatter(rng, 0.62), rng.randf_range(0.0, TAU), surface),
+			ArtPalette.SHORE_ROCK_SCALE)
 
 	var spec := ArtPalette.feature_props(tile)
 	if not spec.is_empty():
@@ -188,19 +203,10 @@ func _build_layer(key: String, group: String, entries: Array, registry: Dictiona
 	multimesh.mesh = mesh
 	multimesh.instance_count = entries.size()
 
-	# Terrain scales to tessellate exactly; props scale to fit a target size.
-	var uniform := 0.0
-	if group == "terrain":
-		uniform = ModelLibrary.normalised_width_scale(mesh, ArtPalette.HEX_SIZE * 2.0)
-
 	for i in entries.size():
 		var entry: Dictionary = entries[i]
 		var transform: Transform3D = entry["transform"]
-		var scale := Vector3.ONE * uniform
-		if uniform == 0.0:
-			scale = Vector3.ONE * ModelLibrary.normalised_max_scale(mesh, float(entry["height"]))
-		# Terrain may squash vertically — Kenney's mountain is a tall spire that
-		# reads as a skyscraper next to a tile two units across.
+		var scale := Vector3.ONE * ModelLibrary.normalised_max_scale(mesh, float(entry["height"]))
 		scale.y *= float(entry.get("y_scale", 1.0))
 		transform.basis = transform.basis.scaled(scale)
 		multimesh.set_instance_transform(i, transform)

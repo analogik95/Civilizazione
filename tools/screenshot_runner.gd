@@ -10,6 +10,8 @@ extends Node
 
 const SETTLE_FRAMES := 8
 
+var _focus_terrain: StringName = &""
+
 
 func run(options: Dictionary) -> bool:
 	var out_path: String = str(options.get("out", "shot.png"))
@@ -19,6 +21,7 @@ func run(options: Dictionary) -> bool:
 	var map_size := StringName(str(options.get("map_size", "tiny")))
 	var zoom := float(options.get("zoom", 26.0))
 	var pitch := float(options.get("pitch", 52.0))
+	_focus_terrain = StringName(str(options.get("focus", "")))
 
 	GameSetup.new_game(Game, {
 		"seed": seed_value, "civs": civs, "map_size": map_size,
@@ -101,6 +104,24 @@ func _print_terrain_census() -> void:
 ## otherwise wherever the most units are standing. Framing the geometric centre
 ## of a map is a good way to photograph open ocean.
 func _focus_point() -> Vector3:
+	# focus=<terrain> aims at the densest cluster of that terrain, which is how
+	# you actually check whether mountains or ice render correctly.
+	if _focus_terrain != &"":
+		var best := Vector2i.ZERO
+		var best_score := -1
+		for tile: Tile in Game.map.all_tiles():
+			if tile.terrain_id != _focus_terrain:
+				continue
+			var score := 0
+			for other: Tile in Game.map.tiles_within(tile.coord, 2):
+				if other.terrain_id == _focus_terrain:
+					score += 1
+			if score > best_score:
+				best_score = score
+				best = tile.coord
+		if best_score > 0:
+			return Hex.to_world(best, ArtPalette.HEX_SIZE)
+
 	var best_city: CityState = null
 	for city: CityState in Game.cities.values():
 		if best_city == null or city.population > best_city.population:
