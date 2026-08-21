@@ -45,8 +45,20 @@ func generate(size: StringName = &"standard", options: Dictionary = {}) -> MapMo
 	_assign_land_and_sea()
 	_place_hills_and_mountains()
 	_erode()
+
+	# The water cycle runs twice, either side of the rivers.
+	#
+	# The first pass tells the river tracer where the rain falls, so headwaters
+	# rise in wet uplands. Carving then adds lakes and river tiles that were not
+	# there when it ran — and a lake the climate never saw is a lake whose
+	# surroundings keep whatever moisture they had, which is exactly how a lake
+	# ends up ringed by desert. The second pass sees them as the water bodies
+	# they are and greens the land around them.
 	_assign_climate()
 	_trace_rivers()
+	_prune_drowned_rivers()
+	_assign_climate()
+
 	_place_features()
 	_identify_continents()
 	_place_resources()
@@ -225,10 +237,12 @@ const EROSION_PERCENTAGE := 55
 
 ## Share of land tiles that become river headwaters.
 const RIVER_PERCENTAGE := 0.05
-## Chance a basin lake spreads to a second tile.
-const EXTRA_LAKE_CHANCE := 0.45
 ## Minimum tiles between two headwaters, so rivers do not braid off one hillside.
 const RIVER_SPACING := 3
+## Shortest run worth keeping, in edges.
+const MIN_RIVER_LENGTH := 6
+## How much uphill a step may go before the walk refuses it.
+const LEVEL_TOLERANCE := 0.004
 
 ## Elevation gap that counts as a cliff, and so as erodible.
 const CLIFF_GAP := 0.16
@@ -341,7 +355,7 @@ func _thin_mountains() -> void:
 		for n in map.neighbors(tile.coord):
 			if n.terrain_id == &"mountains":
 				mountain_neighbours += 1
-		if mountain_neighbours >= 5:
+		if mountain_neighbours >= 6:
 			demoted.append(tile)
 
 	for tile in demoted:
@@ -375,14 +389,25 @@ func _thin_mountains() -> void:
 ## A river then walks downhill to the sea. When it cannot, it has found a basin,
 ## and a lake forms there instead — which is where most of the map's lakes now
 ## come from.
+## Rivers, traced over the corner lattice.
+##
+## A river in this model runs *along* tile edges, so its path is a walk from
+## corner to corner: each step crosses exactly one hex edge, and consecutive
+## steps share the corner between them. That makes the river connected by
+## construction.
+##
+## Tracing over tiles instead — walk downhill tile to tile, mark an edge per
+## step — cannot work, and is what produced the disconnected slivers this
+## replaces: a river running straight through a hex enters and leaves by
+## opposite edges, and opposite edges of a hexagon share no vertex.
 func _trace_rivers() -> void:
-	# Score every inland tile as a headwater: wet uplands first.
-	#
-	# The weights are ranked rather than compared against fixed cutoffs.
-	# Elevation is normalised so most land sits well below 0.3 and moisture
-	# rarely tops 0.5, so any absolute threshold either passes everything or —
-	# as the first version of this did — almost nothing, and the map came out
-	# with three rivers on it.
+	_build_corner_lattice()
+	if _corner_elevation.is_empty():
+		return
+
+	# Score headwaters by moisture and height, so rivers rise in wet uplands
+	# rather than on whichever peak happened to be tallest. A mountain sitting
+	# in a rain shadow is not a source.
 	var scored: Array = []
 	for tile: Tile in map.all_tiles():
 		if not tile.is_land() or tile.terrain_id == &"mountains":
@@ -390,13 +415,15 @@ func _trace_rivers() -> void:
 		if _touches_water(tile):
 			continue   # a river starting here would be one tile long
 		var weight := float(_moisture.get(tile.coord, 0.0)) * (0.35 + clampf(tile.elevation, 0.0, 1.0))
-		if weight <= 0.0:
-			continue
-		scored.append({"tile": tile, "weight": weight})
+		if weight > 0.0:
+			scored.append({"tile": tile, "weight": weight})
 
 	if scored.is_empty():
 		return
 
+	# Ranked rather than thresholded: elevation is normalised and moisture
+	# rarely tops 0.5, so any absolute cutoff either passes everything or almost
+	# nothing.
 	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return a["weight"] > b["weight"])
 
@@ -406,12 +433,10 @@ func _trace_rivers() -> void:
 			land_count += 1
 
 	var budget := maxi(3, int(land_count * RIVER_PERCENTAGE))
-	# Draw from the wettest half, so the choice stays random but never picks a
-	# tile in a rain shadow.
 	var pool := maxi(1, int(scored.size() * 0.5))
 	var placed := 0
 
-	for attempt in pool * 4:
+	for _attempt in pool * 4:
 		if placed >= budget:
 			break
 		var source: Tile = scored[_rng.randi_range(0, pool - 1)]["tile"]
@@ -421,77 +446,237 @@ func _trace_rivers() -> void:
 			placed += 1
 
 
-## Walk downhill to the sea, marking the edge crossed at each step.
+## Corner elevations and the links between them.
 ##
-## Returns false for a river too short to be worth keeping, in which case
-## nothing is written to the map.
-func _trace_one_river(source: Tile) -> bool:
-	var current := source
-	var visited := {current.coord: true}
-	var path_edges: Array = []
+## Every corner is shared by up to three tiles, so it is keyed by welded world
+## position; its elevation is the mean of the tiles touching it. Each link is
+## one hex edge, carrying the tile and direction needed to mark it.
+var _corner_elevation: Dictionary = {}
+var _corner_links: Dictionary = {}     # key -> [{to, tile, direction}, ...]
+var _corner_is_water: Dictionary = {}
+var _corner_position: Dictionary = {}
 
-	for _step in 60:
-		var best: Tile = null
-		var best_direction := -1
-		var best_elevation := current.elevation
 
+func _build_corner_lattice() -> void:
+	_corner_elevation.clear()
+	_corner_links.clear()
+	_corner_is_water.clear()
+	_corner_position.clear()
+
+	var totals: Dictionary = {}
+	var counts: Dictionary = {}
+
+	for tile: Tile in map.all_tiles():
+		var centre := Hex.to_world(tile.coord, 1.0)
+		for i in 6:
+			var position := centre + Hex.corner_offset(i, 1.0)
+			var key := Hex.corner_key(position)
+			totals[key] = float(totals.get(key, 0.0)) + tile.elevation
+			counts[key] = int(counts.get(key, 0)) + 1
+			_corner_position[key] = position
+			if tile.is_water():
+				_corner_is_water[key] = true
+
+	for key: Vector2i in totals:
+		_corner_elevation[key] = float(totals[key]) / float(counts[key])
+
+	# One link per hex edge. Each edge is walked twice, once from either side,
+	# which is what gives both corners a link back to the other.
+	for tile: Tile in map.all_tiles():
+		var centre := Hex.to_world(tile.coord, 1.0)
 		for direction in Hex.DIRECTION_COUNT:
-			var n := map.neighbor_in(current.coord, direction)
-			if n == null or visited.has(n.coord):
+			if map.neighbor_in(tile.coord, direction) == null:
 				continue
-			if n.is_water():
-				# Reached the sea or an existing lake — commit.
-				path_edges.append([current.coord, direction])
-				if path_edges.size() < 2:
-					return false
-				_commit_river(path_edges)
-				return true
-			if n.elevation < best_elevation:
-				best_elevation = n.elevation
-				best = n
-				best_direction = direction
+			var pair := Hex.edge_corners(direction)
+			var a := Hex.corner_key(centre + Hex.corner_offset(pair.x, 1.0))
+			var b := Hex.corner_key(centre + Hex.corner_offset(pair.y, 1.0))
+			_corner_links.get_or_add(a, []).append({
+				"to": b, "tile": tile.coord, "direction": direction,
+			})
 
-		if best == null:
-			# Nowhere lower to go. A river that has run any distance has found a
-			# basin, so it pools there rather than simply stopping in a field.
-			if path_edges.size() >= 2:
+
+## Walk downhill from the source tile's highest corner to the sea, marking the
+## edge crossed at every step.
+func _trace_one_river(source: Tile) -> bool:
+	var current := _highest_corner_of(source)
+	if current == Vector2i.MAX:
+		return false
+
+	var visited := {current: true}
+	var steps: Array = []
+
+	for _step in 120:
+		var links: Array = _corner_links.get(current, [])
+		var best_key := Vector2i.MAX
+		var best_link: Dictionary = {}
+		var here: float = float(_corner_elevation.get(current, 0.0))
+		var best_elevation := INF
+
+		for link: Dictionary in links:
+			var to: Vector2i = link["to"]
+			if visited.has(to):
+				continue
+			var elevation := float(_corner_elevation.get(to, INF))
+			# Strictly downhill would stall on the first flat corner, and
+			# corner elevations are three-tile averages so ties are common.
+			# Allowing a level step lets a river cross a plain to reach the sea
+			# instead of dying two edges from its source.
+			if elevation > here + LEVEL_TOLERANCE:
+				continue
+			if elevation < best_elevation:
+				best_elevation = elevation
+				best_key = to
+				best_link = link
+
+		if best_key == Vector2i.MAX:
+			# Trapped. A genuine depression becomes a lake; anything shorter is
+			# discarded rather than left as a stub in a field.
+			if steps.size() >= MIN_RIVER_LENGTH and _is_basin(current):
 				_form_lake(current)
-				_commit_river(path_edges)
+				_commit_river(steps)
 				return true
 			return false
 
-		path_edges.append([current.coord, best_direction])
-		visited[best.coord] = true
-		current = best
+		steps.append(best_link)
+		visited[best_key] = true
+		current = best_key
+
+		# Reaching water is the river mouth.
+		if _corner_is_water.has(current):
+			# A two-edge trickle beside the coast is not a river. Rejecting
+			# short runs is what stops the map filling with blue slivers.
+			if steps.size() < MIN_RIVER_LENGTH:
+				return false
+			_commit_river(steps)
+			return true
 
 	return false
 
 
-## Flood a basin into a lake. The tile becomes fresh water sitting just below
-## the land around it, which is what makes it read as a lake rather than a hole.
-func _form_lake(tile: Tile) -> void:
-	var lowest := INF
-	for n in map.neighbors(tile.coord):
-		lowest = minf(lowest, n.elevation)
+func _highest_corner_of(tile: Tile) -> Vector2i:
+	var centre := Hex.to_world(tile.coord, 1.0)
+	var best := Vector2i.MAX
+	var best_elevation := -INF
+	for i in 6:
+		var key := Hex.corner_key(centre + Hex.corner_offset(i, 1.0))
+		if _corner_is_water.has(key):
+			continue
+		var elevation := float(_corner_elevation.get(key, -INF))
+		if elevation > best_elevation:
+			best_elevation = elevation
+			best = key
+	return best
 
+
+## True when every neighbouring corner sits higher — a real depression, not
+## merely a spot the walk could not leave because it had been there already.
+func _is_basin(key: Vector2i) -> bool:
+	var here := float(_corner_elevation.get(key, 0.0))
+	for link: Dictionary in _corner_links.get(key, []):
+		if float(_corner_elevation.get(link["to"], INF)) < here:
+			return false
+	return true
+
+
+func _commit_river(steps: Array) -> void:
+	for link: Dictionary in steps:
+		map.set_river(link["tile"], int(link["direction"]), true)
+
+
+## Flood a basin. The three tiles meeting at the corner are candidates; only
+## those genuinely lower than their own surroundings are drowned, so a lake
+## never spills across a slope.
+func _form_lake(key: Vector2i) -> void:
+	var position: Vector3 = _corner_position.get(key, Vector3.ZERO)
+	var seeds: Array[Tile] = []
+	for i in 6:
+		var tile := map.get_tile(Hex.from_world(position + Hex.corner_offset(i, 0.55), 1.0))
+		if tile != null and tile.is_land() and tile.terrain_id != &"mountains" and not seeds.has(tile):
+			seeds.append(tile)
+	if seeds.is_empty():
+		return
+
+	seeds.sort_custom(func(a: Tile, b: Tile) -> bool: return a.elevation < b.elevation)
+	var floor_tile: Tile = seeds[0]
+	_drown(floor_tile, floor_tile.elevation)
+
+	# Extend only into neighbours that are themselves hollows, so a lake follows
+	# the shape of the basin instead of spreading at random.
+	for neighbour in map.neighbors(floor_tile.coord):
+		if not neighbour.is_land() or neighbour.terrain_id == &"mountains":
+			continue
+		if neighbour.elevation <= floor_tile.elevation + 0.015 and _is_hollow(neighbour):
+			_drown(neighbour, floor_tile.elevation)
+
+
+func _drown(tile: Tile, level: float) -> void:
 	tile.terrain_id = &"lake"
 	tile.feature_id = &""
 	tile.is_hills = false
-	tile.elevation = minf(tile.elevation, lowest) - 0.01
+	tile.improvement_id = &""
+	tile.elevation = level - 0.01
 
-	# A lone puddle is noise; give a fair share of lakes a second tile so they
-	# read as water bodies.
-	if _rng.randf() < EXTRA_LAKE_CHANCE:
-		var options: Array[Tile] = []
-		for n in map.neighbors(tile.coord):
-			if n.is_land() and n.terrain_id != &"mountains":
-				options.append(n)
-		if not options.is_empty():
-			var second: Tile = options[_rng.randi_range(0, options.size() - 1)]
-			second.terrain_id = &"lake"
-			second.feature_id = &""
-			second.is_hills = false
-			second.elevation = tile.elevation
+
+## A tile lower than most of what surrounds it.
+func _is_hollow(tile: Tile) -> bool:
+	var higher := 0
+	for n in map.neighbors(tile.coord):
+		if n.elevation > tile.elevation:
+			higher += 1
+	return higher >= 4
+
+
+## Drop river edges that ended up between two water tiles.
+##
+## Forming a lake drowns the ground a chain was running over, and an edge with
+## water on both sides is not a river any more — it is just lake. Left in place
+## these show up as blue slivers stranded in open water, and as isolated edges
+## in the river-continuity test.
+func _prune_drowned_rivers() -> void:
+	for tile: Tile in map.all_tiles():
+		if tile.river_edges == 0 or not tile.is_water():
+			continue
+		for direction in Hex.DIRECTION_COUNT:
+			if not tile.has_river_on(direction):
+				continue
+			var neighbour := map.neighbor_in(tile.coord, direction)
+			if neighbour != null and neighbour.is_water():
+				map.set_river(tile.coord, direction, false)
+
+	_prune_stranded_rivers()
+
+
+## Remove river edges that touch no other river edge at either end.
+##
+## The corner walk produces connected chains, but a handful of edges still end
+## up alone once lakes have been carved and drowned edges removed. A single
+## isolated edge is not a river — it is a blue dash lying in a field, which is
+## exactly what the old tracer produced everywhere and what the continuity test
+## guards against. Cheaper to sweep them up here than to special-case every way
+## one can arise.
+func _prune_stranded_rivers() -> void:
+	var uses: Dictionary = {}
+	var edges: Array = []
+
+	for tile: Tile in map.all_tiles():
+		for direction in Hex.DIRECTION_COUNT:
+			if not tile.has_river_on(direction):
+				continue
+			var centre := Hex.to_world(tile.coord, 1.0)
+			var pair := Hex.edge_corners(direction)
+			var a := Hex.corner_key(centre + Hex.corner_offset(pair.x, 1.0))
+			var b := Hex.corner_key(centre + Hex.corner_offset(pair.y, 1.0))
+			var key := [a, b] if a < b else [b, a]
+			if edges.any(func(e: Array) -> bool: return e[2] == key):
+				continue
+			edges.append([tile.coord, direction, key])
+			uses[a] = int(uses.get(a, 0)) + 1
+			uses[b] = int(uses.get(b, 0)) + 1
+
+	for edge: Array in edges:
+		var key: Array = edge[2]
+		if int(uses.get(key[0], 0)) < 2 and int(uses.get(key[1], 0)) < 2:
+			map.set_river(edge[0], int(edge[1]), false)
 
 
 func _touches_water(tile: Tile) -> bool:
@@ -506,17 +691,6 @@ func _near_river(coord: Vector2i, radius: int) -> bool:
 		if tile.has_river():
 			return true
 	return false
-
-
-func _commit_river(path_edges: Array) -> void:
-	for entry: Array in path_edges:
-		var coord: Vector2i = entry[0]
-		var direction: int = entry[1]
-		# Offset the river onto one of the two edges flanking the direction of
-		# travel, so it runs alongside the tiles rather than straight through
-		# their centres.
-		var edge := (direction + 1) % Hex.DIRECTION_COUNT
-		map.set_river(coord, edge, true)
 
 
 func _place_features() -> void:

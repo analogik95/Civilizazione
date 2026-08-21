@@ -272,6 +272,16 @@ static func corner_offsets(size: float) -> PackedVector3Array:
 	return out
 
 
+## Corners are keyed by rounded world position so the three tiles sharing one
+## can find each other.
+##
+## Note this deliberately does NOT fold X across the wrap seam. Folding only X
+## is wrong — one lap of the map displaces a tile in Z as well, by half a map
+## width, so corners folded on X alone weld to partners half a continent away
+## in Z and tear the mesh open. The seam copies are exact translations of the
+## same geometry, so they already line up; the two sides simply do not share
+## averaged corner data, which is invisible next to the tear that folding
+## caused.
 static func _key(position: Vector3) -> Vector2i:
 	return Vector2i(roundi(position.x * WELD), roundi(position.z * WELD))
 

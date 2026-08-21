@@ -409,15 +409,19 @@ const RIVER_DEPTH := 0.06
 func _add_river_edge(surface: SurfaceTool, tile: Tile, direction: int) -> void:
 	var centre := Hex.to_world(tile.coord, ArtPalette.HEX_SIZE)
 
-	# The two corners bounding edge `direction` on a flat-top hex sit at
-	# 60-degree steps, offset 30 degrees from the direction's own angle.
-	var angle := PI / 3.0 * direction
-	var a := centre + Vector3(
-		cos(angle - PI / 6.0), 0.0, sin(angle - PI / 6.0)
-	) * ArtPalette.HEX_SIZE
-	var b := centre + Vector3(
-		cos(angle + PI / 6.0), 0.0, sin(angle + PI / 6.0)
-	) * ArtPalette.HEX_SIZE
+	# The two corners bounding edge `direction`, from the same helper the map
+	# generator marks rivers with — so the ribbon lands on the edge that was
+	# actually marked.
+	#
+	# This used to derive the corners as 30 degrees either side of the
+	# direction's own angle, which is a different pair entirely: for direction 0
+	# it gave -30 and +30 degrees where the real corners are 0 and 60. Every
+	# ribbon was drawn on the wrong edge, cutting diagonally across a tile
+	# instead of running along its border, which is why connected rivers still
+	# rendered as scattered slivers.
+	var pair := Hex.edge_corners(direction)
+	var a := centre + Hex.corner_offset(pair.x, ArtPalette.HEX_SIZE)
+	var b := centre + Hex.corner_offset(pair.y, ArtPalette.HEX_SIZE)
 
 	# Sit the water on the ground the edge actually has, which is the welded
 	# corner height rather than either tile's centre. Using a centre height

@@ -24,6 +24,7 @@ func run_all() -> int:
 	_run_suite("city rules", _test_city_rules)
 	_run_suite("district adjacency", _test_adjacency)
 	_run_suite("research and boosts", _test_research)
+	_run_suite("rivers", _test_rivers)
 	_run_suite("determinism", _test_determinism)
 
 	print("\n=== %d assertions, %d failures ===\n" % [_assertions, _failures])
@@ -417,3 +418,56 @@ func _test_determinism() -> void:
 	RNGService.stream(RNGService.STREAM_MAP).randf()
 	var combat_after := RNGService.stream(RNGService.STREAM_COMBAT).randf()
 	check_near(combat_first, combat_after, 0.0000001, "RNG streams are independent")
+
+
+func _test_rivers() -> void:
+	RNGService.seed_game(31337)
+	var map := MapGenerator.new().generate(&"tiny")
+
+	# Collect every marked edge as the pair of corners it spans.
+	var edges: Array = []
+	var corner_uses: Dictionary = {}
+	for tile: Tile in map.all_tiles():
+		for direction in Hex.DIRECTION_COUNT:
+			if not tile.has_river_on(direction):
+				continue
+			var centre := Hex.to_world(tile.coord, 1.0)
+			var pair := Hex.edge_corners(direction)
+			var a := Hex.corner_key(centre + Hex.corner_offset(pair.x, 1.0))
+			var b := Hex.corner_key(centre + Hex.corner_offset(pair.y, 1.0))
+			# Both tiles record the shared edge; count it once.
+			var key := [a, b] if a < b else [b, a]
+			if edges.has(key):
+				continue
+			edges.append(key)
+			corner_uses[a] = int(corner_uses.get(a, 0)) + 1
+			corner_uses[b] = int(corner_uses.get(b, 0)) + 1
+
+	check(edges.size() > 10, "the map has rivers on it (got %d edges)" % edges.size())
+
+	# A river is a chain, so every edge must meet another at one of its corners.
+	# An edge whose corners are used only by itself is a floating sliver, which
+	# is exactly the bug this guards against.
+	var orphans := 0
+	for edge: Array in edges:
+		if int(corner_uses.get(edge[0], 0)) < 2 and int(corner_uses.get(edge[1], 0)) < 2:
+			orphans += 1
+
+	check(orphans == 0, "no river edge is isolated (found %d of %d)" % [orphans, edges.size()])
+
+	# A river has to reach water somewhere, or it is a canal to nowhere.
+	var reaches_water := false
+	for tile: Tile in map.all_tiles():
+		if tile.has_river() and _touches_water(map, tile):
+			reaches_water = true
+			break
+	check(reaches_water, "at least one river reaches the sea or a lake")
+
+
+func _touches_water(map: MapModel, tile: Tile) -> bool:
+	if tile.is_water():
+		return true
+	for n in map.neighbors(tile.coord):
+		if n.is_water():
+			return true
+	return false

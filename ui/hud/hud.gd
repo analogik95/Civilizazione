@@ -15,6 +15,7 @@ extends Control
 signal end_turn_pressed()
 signal next_unit_pressed()
 signal action_requested(action: StringName)
+signal lens_toggled()
 
 const PANEL_BG := Color(0.09, 0.11, 0.16, 0.92)
 const PANEL_EDGE := Color(0.42, 0.52, 0.68, 0.85)
@@ -35,6 +36,7 @@ var _action_bar: HBoxContainer
 var _city_panel: PanelContainer
 var _city_body: VBoxContainer
 var _toast: Label
+var _lens_button: Button
 var _game_over: PanelContainer
 
 
@@ -61,11 +63,14 @@ func _styled_panel() -> PanelContainer:
 	return panel
 
 
-func _label(text: String, size: int = 14, color: Color = Color.WHITE) -> Label:
+func _label(text: String, size: int = 14, color: Color = Color.WHITE, wrap: bool = false) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
+	if wrap:
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return label
 
 
@@ -153,6 +158,12 @@ func _build_unit_panel() -> void:
 	buttons.add_theme_constant_override("separation", 6)
 	column.add_child(buttons)
 
+	_lens_button = _button("Yields (Y)", "Show each tile's yields as coloured pips.")
+	_lens_button.toggle_mode = true
+	_lens_button.pressed.connect(func() -> void: lens_toggled.emit())
+	_action_bar.get_parent().add_child(_lens_button)
+	_action_bar.get_parent().move_child(_lens_button, _action_bar.get_index() + 1)
+
 	var next_unit := _button("Next Unit  (Tab)")
 	next_unit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	next_unit.pressed.connect(func() -> void: next_unit_pressed.emit())
@@ -169,14 +180,17 @@ func _build_city_panel() -> void:
 	_city_panel = _styled_panel()
 	_city_panel.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	_city_panel.offset_left = 8
-	_city_panel.offset_top = -190
-	_city_panel.offset_right = 330
-	_city_panel.offset_bottom = 210
+	_city_panel.offset_top = -215
+	_city_panel.offset_right = 400
+	_city_panel.offset_bottom = 235
 	_city_panel.visible = false
 	_city_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_city_panel)
 
 	var scroll := ScrollContainer.new()
+	# Vertical only: the horizontal bar was clipping the yield line rather than
+	# letting it wrap, so "Housing" and "Faith" ran off the edge.
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_city_panel.add_child(scroll)
 
 	_city_body = VBoxContainer.new()
@@ -397,7 +411,7 @@ func _refresh_city() -> void:
 			city.population, int(city.loyalty),
 			city.specialty_district_count(), city.district_allowance(),
 			city.population, int(city.housing),
-		], 12, TEXT_DIM))
+		], 12, TEXT_DIM), true)
 
 	var mood_names := ["Ecstatic", "Happy", "Content", "Displeased", "Unhappy", "In Revolt"]
 	_city_body.add_child(_label(
@@ -412,7 +426,7 @@ func _refresh_city() -> void:
 			y.get_kind(Yields.Kind.PRODUCTION), y.get_kind(Yields.Kind.GOLD),
 			y.get_kind(Yields.Kind.SCIENCE), y.get_kind(Yields.Kind.CULTURE),
 			y.get_kind(Yields.Kind.FAITH),
-		], 12))
+		], 12, Color.WHITE, true))
 
 	var growth := city.turns_until_growth()
 	_city_body.add_child(_label(
@@ -547,3 +561,8 @@ func show_game_over(message: String) -> void:
 	quit.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://ui/screens/main_menu.tscn"))
 	column.add_child(quit)
+
+
+func set_lens_active(on: bool) -> void:
+	if _lens_button != null:
+		_lens_button.button_pressed = on

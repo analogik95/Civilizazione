@@ -127,3 +127,42 @@ static func line(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 		var fr := lerpf(float(a.y), float(b.y) + 1e-6, t)
 		out.append(round_axial(fq, fr))
 	return out
+
+
+# -------------------------------------------------------------------------
+# Corners
+# -------------------------------------------------------------------------
+#
+# The six corners of a hex, and which pair of them bounds each edge.
+#
+# This matters for rivers. A river in the Civ 6 model runs *along* edges, not
+# through tiles, so its path is a walk over the corner lattice: every corner
+# touches three tiles, connects to three neighbouring corners, and each
+# corner-to-corner step is exactly one hex edge. Tracing there makes a
+# connected river by construction — tracing over tiles cannot, because a river
+# running straight through a hex enters and leaves by opposite edges, which
+# share no vertex.
+
+## Corner i sits at angle 60*i degrees from the tile centre.
+static func corner_offset(index: int, size: float) -> Vector3:
+	var angle := PI / 3.0 * float(index)
+	return Vector3(cos(angle), 0.0, sin(angle)) * size
+
+
+## The two corner indices bounding the edge toward `direction`.
+##
+## Derived from the geometry: the neighbour in direction d lies at some angle,
+## and the edge crossed to reach it is bounded by the corners 30 degrees either
+## side of that angle. Working that through for all six gives (-d, 1-d) mod 6.
+static func edge_corners(direction: int) -> Vector2i:
+	return Vector2i(posmod(-direction, 6), posmod(1 - direction, 6))
+
+
+## Stable key for a corner shared by up to three tiles. Corners are compared by
+## rounded world position because three different tiles each name the same
+## corner by a different local index.
+const CORNER_WELD := 1000.0
+
+static func corner_key(position: Vector3) -> Vector2i:
+	return Vector2i(roundi(position.x * CORNER_WELD), roundi(position.z * CORNER_WELD))
+

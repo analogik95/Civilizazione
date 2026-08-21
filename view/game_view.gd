@@ -11,6 +11,7 @@ extends Node3D
 @onready var _units: UnitRenderer = $UnitRenderer
 @onready var _cities: CityRenderer = $CityRenderer
 @onready var _overlay: TileOverlay = $TileOverlay
+@onready var _yield_lens: YieldLens = $YieldLens
 @onready var _camera_rig: Node3D = $CameraRig
 @onready var _hud: Control = $UI/HUD
 @onready var _environment: WorldEnvironment = $WorldEnvironment
@@ -34,6 +35,7 @@ func _ready() -> void:
 
 	_world.viewing_player_id = _human_id
 	_world.build(Game.map)
+	_yield_lens.viewing_player_id = _human_id
 	_units.viewing_player_id = _human_id
 	_units.rebuild()
 	_cities.rebuild()
@@ -43,6 +45,7 @@ func _ready() -> void:
 	_hud.end_turn_pressed.connect(_on_end_turn)
 	_hud.action_requested.connect(_on_action)
 	_hud.next_unit_pressed.connect(_select_next_idle_unit)
+	_hud.lens_toggled.connect(_toggle_yield_lens)
 
 	EventBus.player_turn_started.connect(_on_player_turn_started)
 	EventBus.game_over.connect(_on_game_over)
@@ -55,6 +58,14 @@ func _ready() -> void:
 
 	_select_next_idle_unit()
 	_hud.refresh()
+
+
+## Civ 6 keeps its lenses on a toggle rather than a mode, so the player can flip
+## yields on, judge a settle site, and flip them off without losing selection.
+func _toggle_yield_lens() -> void:
+	var on := _yield_lens.toggle()
+	_hud.set_lens_active(on)
+	_hud.notify("Yields lens on" if on else "Yields lens off")
 
 
 func _find_human() -> int:
@@ -99,6 +110,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					_refresh_selection()
 			KEY_B:
 				_on_action(&"found_city")
+			KEY_Y:
+				_toggle_yield_lens()
 			KEY_ESCAPE:
 				_clear_selection()
 

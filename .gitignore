@@ -70,7 +70,6 @@ logs/
 .godot/
 .import/
 export.cfg
-export_presets.cfg
 *.translation
 build_out/
 *.tmp
@@ -81,3 +80,6 @@ build_out/
 # Toolchain and asset caches — fetched by tools/, never committed.
 .toolchain/
 .assetcache/
+
+# Exported binaries — built by tools/, not committed (100MB+ each).
+build/

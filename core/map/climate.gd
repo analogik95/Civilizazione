@@ -33,6 +33,11 @@ const RUNOFF := 0.25
 const SEEPAGE := 0.125
 const STARTING_MOISTURE := 0.1
 
+## A river tile is wet ground, but not open sea — it evaporates at a fraction of
+## the rate and holds a floor of moisture rather than a full reservoir.
+const RIVER_EVAPORATION := 0.55
+const RIVER_MOISTURE := 0.62
+
 ## Direction the wind blows *toward*, as an index into Hex.DIRECTIONS.
 const WIND_DIRECTION := 3
 ## How much more cloud goes downwind than to any other neighbour. At 1.0 the
@@ -86,10 +91,15 @@ static func simulate(map: MapModel, rng: RandomNumberGenerator) -> Dictionary:
 			var cell_clouds: float = clouds[coord]
 			var cell_moisture: float = moisture[coord]
 
-			# 1. Evaporation.
+			# 1. Evaporation. A river running past a tile is standing fresh
+			#    water on it, so it evaporates too — which is why river valleys
+			#    are green even when the country around them is not.
 			if tile.is_water():
 				cell_clouds += EVAPORATION
 				cell_moisture = 1.0
+			elif tile.has_river():
+				cell_clouds += EVAPORATION * RIVER_EVAPORATION
+				cell_moisture = maxf(cell_moisture, RIVER_MOISTURE)
 			else:
 				var evaporated := cell_moisture * EVAPORATION
 				cell_moisture -= evaporated

@@ -58,6 +58,12 @@ func run(options: Dictionary) -> bool:
 
 	await _shot("turns")
 
+	# The yields lens is view state, so the only way to know it works is to turn
+	# it on and look at the result.
+	view.call("_toggle_yield_lens")
+	await _settle()
+	await _shot("lens")
+
 	var human_cities: int = Game.city_count_of(0)
 	print("After %d turns: turn %d, human holds %d cities, %d units on the map." % [
 		turns, Game.turn, human_cities, Game.units.size()
