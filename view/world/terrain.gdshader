@@ -20,13 +20,25 @@ uniform sampler2D noise_texture : hint_default_white, repeat_enable, filter_line
 // patches larger than a tile, so terrain does not look uniform across a
 // continent. The fine one gives close-up texture.
 uniform float coarse_scale = 0.035;
-uniform float coarse_strength = 0.16;
+uniform float coarse_strength = 0.15;
+// A middle octave at roughly tile scale. Without it the ground had regional
+// drift and fine grain but nothing in between, so the eye read the space
+// between the two as flat.
+uniform float medium_scale = 0.13;
+uniform float medium_strength = 0.11;
 uniform float fine_scale = 0.34;
-uniform float fine_strength = 0.09;
+uniform float fine_strength = 0.08;
 
-// Slopes darken slightly, which is what makes gentle relief legible on ground
-// that is otherwise one flat colour.
-uniform float slope_shading = 0.22;
+// Ground colour drifts in hue as well as brightness. Real terrain is not one
+// green at several exposures; it goes yellow where it is dry and blue-green
+// where it is shaded, and mimicking that is most of what separates painted
+// ground from flat fill.
+uniform vec3 warm_tint = vec3(0.06, 0.03, -0.04);
+uniform float tint_strength = 0.32;
+
+// Slopes darken, which is what makes relief legible on ground that is otherwise
+// one flat colour — and on mountains it is what turns a grey lump into faces.
+uniform float slope_shading = 0.34;
 
 uniform float roughness_value = 0.95;
 
@@ -40,12 +52,14 @@ void vertex() {
 
 void fragment() {
 	float coarse = texture(noise_texture, world_position.xz * coarse_scale).r;
+	float medium = texture(noise_texture, world_position.xz * medium_scale + 0.37).r;
 	float fine = texture(noise_texture, world_position.xz * fine_scale).r;
 
-	// Centre both octaves on zero so they lighten and darken equally rather
+	// Centre every octave on zero so they lighten and darken equally rather
 	// than only ever brightening the base colour.
 	float variation =
 		(coarse - 0.5) * 2.0 * coarse_strength +
+		(medium - 0.5) * 2.0 * medium_strength +
 		(fine - 0.5) * 2.0 * fine_strength;
 
 	// A face pointing straight up gets no slope shading; anything tilted gets
@@ -53,7 +67,13 @@ void fragment() {
 	float flatness = clamp(world_normal.y, 0.0, 1.0);
 	float slope = (1.0 - flatness) * slope_shading;
 
-	vec3 albedo = COLOR.rgb * (1.0 + variation) * (1.0 - slope);
+	// Warm where the coarse octave is high, cool where it is low. Scaled by how
+	// saturated the ground already is, so grey rock and white snow stay neutral
+	// instead of picking up a green cast.
+	float saturation = max(max(COLOR.r, COLOR.g), COLOR.b) - min(min(COLOR.r, COLOR.g), COLOR.b);
+	vec3 tint = warm_tint * ((coarse - 0.5) * 2.0) * tint_strength * saturation * 2.5;
+
+	vec3 albedo = (COLOR.rgb + tint) * (1.0 + variation) * (1.0 - slope);
 
 	ALBEDO = clamp(albedo, vec3(0.0), vec3(1.0));
 	ROUGHNESS = roughness_value;

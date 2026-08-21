@@ -41,17 +41,24 @@ same mechanics and same numbers, original presentation.
 | Barbarians | **Working.** Outposts, scouts, raids. |
 | AI | **Working.** Flavour-weighted strategy + tactical combat. |
 | Victory | Domination + Score only. Four others stubbed. |
-| **3D view layer** | **Not built.** |
-| **UI** | **Not built.** |
+| **3D view layer** | **Working.** Continuous hex terrain, rivers, shore foam, wrapping, unit + city renderers, hex grid, yields lens, territory borders. |
+| **UI** | **Working.** Main menu, HUD, city panel, research/civic panel, unit actions, notifications. |
 | Save/load | Serialisers exist on every state class; no file I/O yet. |
 | Great People, Religion, Trade | Not built (points accumulate, nothing spends them). |
 | Diplomacy, World Congress | Not built. |
 | Era score, Golden Ages, Governors | Not built. |
 | Climate, disasters, power | Not built. |
 
-**The single most important gap: there is no view layer and no UI.** The game
-is a complete, correct, testable simulation that currently has no way for a
-human to see or play it. That is the next milestone.
+**The remaining gaps are content and polish, not structure.** The simulation is
+complete and testable, and there is now a playable view over it. What is missing
+is the systems listed as "Not built" above, four victory types, and save/load
+file I/O.
+
+The one deliberate omission worth naming: **there is no fog of war.** Civ 6's
+whole art direction is cartographic — unexplored ground is blank parchment,
+partially seen ground is drawn in pen-and-ink cross-hatch — and that is the
+largest remaining visual gap between this and the real game. It is out of scope
+by an explicit product decision, not an oversight: the whole map is visible.
 
 ---
 
@@ -65,19 +72,40 @@ human to see or play it. That is the next milestone.
 Run things:
 
 ```bash
-# Unit tests — 212 assertions on the formulas
+# Unit tests — 215 assertions on the formulas
 .toolchain/godot --headless --path . -- --test
 
 # Headless AI-vs-AI soak run
 .toolchain/godot --headless --path . -- --sim turns=100 civs=5 map_size=small seed=7
 .toolchain/godot --headless --path . -- --sim turns=150 civs=6 verbose=1
 
-# Interactive (currently does nothing — no UI yet)
+# Interactive
 .toolchain/godot --path .
+
+# Render one frame of a generated map, without booting the game scene
+.toolchain/godot --path . -- --shot seed=7 map_size=small out=/tmp/map.png
+
+# Boot the real scene and drive it: found a capital, run turns, screenshot each
+# stage. This is the one that catches view bugs a green test suite does not.
+.toolchain/godot --path . -- --play turns=5 seed=7 civs=4 map_size=tiny shots=/tmp/x
+```
+
+On a headless box, wrap the two rendering commands:
+
+```bash
+xvfb-run -a -s "-screen 0 1600x900x24" \
+  .toolchain/godot --path . --rendering-driver opengl3 -- --play shots=/tmp/x
 ```
 
 `--sim` options: `turns`, `civs`, `map_size` (duel/tiny/small/standard/large/huge),
 `seed`, `verbose=1`.
+
+**Look at the screenshots.** Every visual bug in this project so far — rivers on
+the wrong edges, a lake in the middle of a desert, a white ring instead of a
+shoreline, yield pips that read as orange debug boxes, city banner text
+swallowed by its own outline — passed the test suite and was obvious in a
+rendered frame. `--play` writing PNGs is not a formality; it is the only check
+that covers the view layer.
 
 ---
 
@@ -235,39 +263,53 @@ numbers are less certain.
 
 ---
 
-## 8. Next milestone: the view layer and UI
+## 8. The view layer
 
-This is the highest-value work available and the reason a build is not yet
-playable. The design reference is the twelve Civ 6 screenshots the user supplied
-(see `docs/UI_REFERENCE.md`): use them for **information architecture** — what
-each panel must show and where it sits — and build the chrome from CC0/original
-art.
+Built. The design reference is the twelve Civ 6 screenshots the user supplied
+(see `docs/UI_REFERENCE.md`) — used for **information architecture**, what each
+panel must show and where it sits. All chrome and art is CC0 or original.
 
-Suggested order:
+### What is there
 
-1. **`view/world/hex_world.gd`** — `Node3D` + `MultiMeshInstance3D` per terrain
-   type, positioned via `Hex.to_world(coord, size)`. Rebuild on
-   `EventBus.map_generated`, patch single tiles on `tile_changed`.
-2. **Camera rig** — pan (WASD/edge), zoom, and a click-to-tile raycast using
-   `Hex.from_world()`.
-3. **Fog** — unexplored renders as flat parchment, explored-but-not-visible
-   dimmed. `MapModel.explored` / `.visible` already track this per player.
-4. **Unit and city views** — one node per `UnitState`/`CityState`, driven by
-   `unit_created` / `unit_moved` / `unit_killed` / `city_founded`.
-5. **HUD** — top yield bar, turn counter, End Turn button, unit action bar.
-6. **City screen** — the panel in the screenshots showing Loyalty / Districts /
-   Amenities / Housing, turns-to-growth, turns-to-production, and the production
-   list from `CitySystem.available_production()`.
-7. **District placement preview** — hover a site and show the adjacency it would
-   deliver. `Adjacency.rank_sites()` already returns exactly this, ranked.
-8. **Tech and civic trees** — era-banded columns, node = name + turns + unlocks +
-   "To Boost:" hint, highlighted when boosted. `EmpireDefs.TreeNodeDef.boost_text`
-   is already populated.
-9. **Government screen** — slot rows by type from `PlayerState.policy_slots()`,
-   available cards filtered by `PolicyDef.fits_slot()`.
+| File | Draws |
+|---|---|
+| `view/world/terrain_mesh.gd` | The ground: one continuous welded mesh, flat tile cores with blended edge rings, mountains as part of the mesh so ranges weld into ridges. |
+| `view/world/terrain.gdshader` | Three octaves of world-space noise plus a hue drift and slope shading, so ground is a painted field rather than flat fill. |
+| `view/world/hex_world.gd` | Composition of terrain, water, rivers, ice, territory borders, and the wrap laps. |
+| `view/world/unit_renderer.gd` | One node per unit: model, owner-coloured flag with class icon, health bar, order badge. |
+| `view/world/city_renderer.gd` | Keep + houses that grow with population + walls, under a banner carrying name, population and current production. |
+| `view/world/screen_scale.gd` | Holds flags and banners near a constant screen size across the zoom range. |
+| `view/overlays/hex_grid.gd` | Tile outlines, terrain-following, toggled with G. |
+| `view/overlays/yield_lens.gd` | Civ 6-style yield icon badges per tile, toggled with Y. |
+| `view/camera_rig.gd` | Pan, zoom, pitch, click-to-tile raycast. |
+| `ui/` | Main menu, HUD, city panel, research panel, unit actions, notifications. |
 
-Everything those screens need is already queryable from the simulation. None of
-it requires a rules change.
+### Three things that will bite you
+
+**The corner lattice.** Anything drawn on a hex *edge* — rivers, the grid,
+territory borders — must get its corner pair from `Hex.edge_corners(direction)`.
+Deriving it as `angle ± 30°` looks right and is wrong: it picks the edge one
+step round. That bug shipped twice, once in the river tracer and once in the
+border renderer, and in both cases the geometry rendered fine and landed on the
+wrong side of the tile.
+
+**Perturbation order.** `TerrainMesh.perturb()` displaces a point horizontally
+by noise sampled *at that point*. To sit on a terrain edge you must perturb the
+true corner and inset afterwards; insetting first samples different noise and
+slides the overlay off the ground it is tracing.
+
+**Nothing rebuilds per frame.** Grid, borders and terrain are built once per map
+(borders coalesce their rebuild through `request_border_refresh`). The yields
+lens learned this the hard way: unshaded spheres with depth test off turned the
+map into a slideshow on software rendering, and the fix was cheap billboarded
+quads with depth test on.
+
+### What is left visually
+
+- Fog of war — out of scope by product decision, and the largest remaining gap.
+- The wrap seam still shows a hairline. Folding world X alone is not the fix:
+  one lap displaces in Z too, and welding on X alone tears the mesh.
+- The polar ice shelf ends in a hard cut rather than breaking up into floes.
 
 ### Blender
 
@@ -283,7 +325,7 @@ into `assets/art/models/`. Keep the style deliberately distinct from Civ 6's.
 
 ---
 
-## 9. Roadmap after the UI
+## 9. Roadmap
 
 M2 Great People, religion, trade routes · M3 diplomacy, World Congress,
 espionage · M4 loyalty extras, governors, era score and Golden Ages · M5 climate,
@@ -302,5 +344,9 @@ to the Future era · M8 presentation polish.
 - Add an invariant to `sim_runner._audit()` whenever you add state that could
   become inconsistent.
 - Add an assertion to `test_runner.gd` whenever you implement a formula.
+- **Render and look at it.** Any change to `view/` or `ui/` ends with a
+  `--play ... shots=` run and an actual look at the PNGs. Every visual bug this
+  project has had passed `--test`.
 - Content goes in JSON, not in `if` statements.
-- Never add Firaxis assets.
+- Never add Firaxis assets. Art is CC0 (credited in `assets/art/CREDITS.md`) or
+  authored here. Rules are reimplemented from published community research.

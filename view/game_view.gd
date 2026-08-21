@@ -12,13 +12,10 @@ extends Node3D
 @onready var _cities: CityRenderer = $CityRenderer
 @onready var _overlay: TileOverlay = $TileOverlay
 @onready var _yield_lens: YieldLens = $YieldLens
+@onready var _hex_grid: HexGrid = $HexGrid
 @onready var _camera_rig: Node3D = $CameraRig
 @onready var _hud: Control = $UI/HUD
 @onready var _environment: WorldEnvironment = $WorldEnvironment
-
-## The ring drawn under the selected unit. Parented to the unit's own view so it
-## follows the movement tween for free.
-var _selection_ring: Node3D = null
 
 var _human_id: int = 0
 var _selected_unit: UnitState = null
@@ -35,6 +32,7 @@ func _ready() -> void:
 
 	_world.viewing_player_id = _human_id
 	_world.build(Game.map)
+	_hex_grid.rebuild()
 	_yield_lens.viewing_player_id = _human_id
 	_units.viewing_player_id = _human_id
 	_units.rebuild()
@@ -112,6 +110,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_on_action(&"found_city")
 			KEY_Y:
 				_toggle_yield_lens()
+			KEY_G:
+				_hud.notify("Grid on" if _hex_grid.toggle() else "Grid off")
 			KEY_ESCAPE:
 				_clear_selection()
 
@@ -149,46 +149,16 @@ func _on_click(coord: Vector2i) -> void:
 
 func _select(unit: UnitState) -> void:
 	_selected_unit = unit
-	_attach_selection_ring(unit)
+	_units.set_selected(unit.id)
 	_update_reachable()
 	_hud.set_selected_unit(unit)
 
 
 func _clear_selection() -> void:
 	_selected_unit = null
-	_attach_selection_ring(null)
+	_units.set_selected(-1)
 	_overlay.clear()
 	_hud.set_selected_unit(null)
-
-
-## Move the selection ring onto a unit's view node, so it tracks the unit
-## through its movement animation without any per-frame work here.
-func _attach_selection_ring(unit: UnitState) -> void:
-	if _selection_ring != null:
-		_selection_ring.queue_free()
-		_selection_ring = null
-	if unit == null:
-		return
-
-	var view: Node3D = _units.view_for(unit.id)
-	if view == null:
-		return
-
-	var ring := MeshInstance3D.new()
-	var mesh := TorusMesh.new()
-	mesh.inner_radius = ArtPalette.HEX_SIZE * 0.34
-	mesh.outer_radius = ArtPalette.HEX_SIZE * 0.44
-	mesh.rings = 6
-	ring.mesh = mesh
-
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(1.0, 0.93, 0.42)
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	ring.material_override = material
-	ring.position.y = 0.06
-
-	view.add_child(ring)
-	_selection_ring = ring
 
 
 func _refresh_selection() -> void:
@@ -197,6 +167,10 @@ func _refresh_selection() -> void:
 		return
 	if _selected_unit != null:
 		_update_reachable()
+		# The highlight lives on the unit's flag, and a rebuild replaces every
+		# flag — so re-assert it here rather than only on the click that
+		# selected the unit.
+		_units.set_selected(_selected_unit.id)
 		_hud.set_selected_unit(_selected_unit)
 	_hud.refresh()
 
@@ -347,6 +321,7 @@ func _run_ai_until_human() -> void:
 			await get_tree().process_frame
 
 	_world.build(Game.map)
+	_hex_grid.rebuild()
 	_units.rebuild()
 	_cities.rebuild()
 	_hud.refresh()

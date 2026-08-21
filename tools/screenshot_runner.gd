@@ -41,6 +41,14 @@ func run(options: Dictionary) -> bool:
 	add_child(world)
 	world.build(Game.map)
 
+	# `hide=Rivers,Borders` blanks named layers. Bisecting by hand is how you
+	# find out which layer an unexplained mark on the map belongs to, and doing
+	# it from the command line beats editing the renderer and rebuilding.
+	for name: String in str(options.get("hide", "")).split(",", false):
+		for child in world.get_children():
+			if str(child.name).begins_with(name.strip_edges()) and child is Node3D:
+				(child as Node3D).visible = false
+
 	var units := UnitRenderer.new()
 	add_child(units)
 	units.rebuild()
@@ -67,6 +75,16 @@ func run(options: Dictionary) -> bool:
 		out_path, image.get_width(), image.get_height(),
 		Game.turn, Game.cities.size(), Game.units.size(),
 	])
+	if options.has("layers"):
+		for child in world.get_children():
+			print("  child %s (%s)" % [child.name, child.get_class()])
+	for layer: String in ["Land", "Water", "Rivers", "Borders"]:
+		var node := world.get_node_or_null(NodePath(layer))
+		var mesh: Mesh = (node as MeshInstance3D).mesh if node is MeshInstance3D else null
+		print("  layer %-8s %s" % [
+			layer,
+			"absent" if mesh == null else "%d vertices" % mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX].size(),
+		])
 	print("  focus %v | city views %d | unit views %d | world layers %d" % [
 		_focus_point(), cities.get_child_count(), units.get_child_count(),
 		world.get_child_count(),

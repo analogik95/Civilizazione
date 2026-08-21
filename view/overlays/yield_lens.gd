@@ -1,33 +1,38 @@
 class_name YieldLens
 extends Node3D
 
-## Civ 6-style yields lens: one pip per yield point, floating over each tile.
+## Civ 6-style yields lens: one icon per yield point, floating over each tile.
 ##
 ## The point of the lens is comparison at a glance — which of these tiles is
 ## worth working, which is worth settling — so it draws quantity as countable
-## marks rather than numbers. Six pips of production read as "more" faster than
-## the digit 6 does at map zoom.
+## marks rather than numbers. Three wheat sheaves read as "more" faster than the
+## digit 3 does at map zoom.
 ##
-## Pips sit on the perturbed ground like every other overlay; placing them at
+## They have to be *icons*, not coloured shapes. The first version drew flat
+## boxes, and a box tells you nothing about which yield it stands for — you have
+## to be told that orange means production, and then remember it. A hammer does
+## not need explaining.
+##
+## Icons sit on the perturbed ground like every other overlay; placing them at
 ## the ideal hex centre leaves them hovering beside the tile they describe.
 
-const PIP_RADIUS := 0.20
-const PIP_SPACING := 0.44
-const ROW_SPACING := 0.40
+const ICON_SIZE := 0.46
+const ICON_SPACING := 0.40
+const ROW_SPACING := 0.38
 const PER_ROW := 3
-const LIFT := 0.55
+const LIFT := 0.62
 ## Beyond this a tile is a wall of dots rather than information.
 const MAX_PIPS_PER_KIND := 5
 
-## Deliberately the same hues the HUD uses for the same yields, so the lens and
-## the top bar teach each other.
-const PIP_COLOR := {
-	Yields.Kind.FOOD: Color(0.42, 0.82, 0.36),
-	Yields.Kind.PRODUCTION: Color(0.95, 0.62, 0.26),
-	Yields.Kind.GOLD: Color(1.0, 0.85, 0.30),
-	Yields.Kind.SCIENCE: Color(0.45, 0.75, 1.0),
-	Yields.Kind.CULTURE: Color(0.80, 0.50, 1.0),
-	Yields.Kind.FAITH: Color(0.95, 0.95, 0.98),
+## The icon carries its own colour, so the material stays plain white and one
+## shader path serves every kind.
+const ICON_PATH := {
+	Yields.Kind.FOOD: "res://assets/art/ui/yields/food.svg",
+	Yields.Kind.PRODUCTION: "res://assets/art/ui/yields/production.svg",
+	Yields.Kind.GOLD: "res://assets/art/ui/yields/gold.svg",
+	Yields.Kind.SCIENCE: "res://assets/art/ui/yields/science.svg",
+	Yields.Kind.CULTURE: "res://assets/art/ui/yields/culture.svg",
+	Yields.Kind.FAITH: "res://assets/art/ui/yields/faith.svg",
 }
 
 ## Draw order, so a tile's pips always read food-first regardless of what it has.
@@ -39,7 +44,8 @@ const KIND_ORDER := [
 var active: bool = false
 var viewing_player_id: int = -1
 
-var _pip_mesh: BoxMesh = null
+var _quad_mesh: QuadMesh = null
+var _materials: Dictionary = {}
 
 
 func _ready() -> void:
@@ -64,16 +70,42 @@ func set_active(value: bool) -> void:
 		_clear()
 
 
-## A flat quad, not a sphere.
-##
-## The lens can put ten thousand pips on a standard map, and each one is drawn
-## unshaded on top of the terrain. A sphere is sixty-odd triangles of that; a
-## box is twelve, and at this size nobody can tell the difference.
-func _mesh() -> BoxMesh:
-	if _pip_mesh == null:
-		_pip_mesh = BoxMesh.new()
-		_pip_mesh.size = Vector3(PIP_RADIUS * 2.0, PIP_RADIUS * 0.4, PIP_RADIUS * 2.0)
-	return _pip_mesh
+## One quad, shared by every icon. The lens can put thousands of these on a
+## standard map, so the mesh is two triangles and the only per-kind cost is the
+## material.
+func _mesh() -> QuadMesh:
+	if _quad_mesh == null:
+		_quad_mesh = QuadMesh.new()
+		_quad_mesh.size = Vector2(ICON_SIZE, ICON_SIZE)
+	return _quad_mesh
+
+
+## Billboarded so icons face the camera at every zoom and pitch. Lying flat on
+## the ground they foreshorten to slivers the moment the camera tilts, which is
+## half of why the boxes were unreadable.
+func _material(kind: Yields.Kind) -> StandardMaterial3D:
+	if _materials.has(kind):
+		return _materials[kind]
+
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	# Keep the size constant in world space rather than screen space, so a tile
+	# with six icons never swamps its neighbours when zoomed in.
+	material.billboard_keep_scale = true
+	material.render_priority = 2
+	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+
+	var path: String = ICON_PATH.get(kind, "")
+	if path != "" and ResourceLoader.exists(path):
+		material.albedo_texture = load(path)
+	else:
+		push_warning("YieldLens: missing icon %s" % path)
+		material.albedo_color = Color(1, 0, 1)
+
+	_materials[kind] = material
+	return material
 
 
 func _clear() -> void:
@@ -115,7 +147,7 @@ func rebuild() -> void:
 			# Centre each row on the tile so the cluster stays balanced whether
 			# it holds two pips or twelve.
 			var in_row := mini(PER_ROW, pips.size() - row * PER_ROW)
-			var x := (float(column) - (in_row - 1) * 0.5) * PIP_SPACING
+			var x := (float(column) - (in_row - 1) * 0.5) * ICON_SPACING
 			var z := (float(row) - (rows - 1) * 0.5) * ROW_SPACING
 			batches.get_or_add(pips[index], []).append(base + Vector3(x, 0.0, z))
 
@@ -131,17 +163,9 @@ func _build_batch(kind: Yields.Kind, positions: Array) -> void:
 	for i in positions.size():
 		multimesh.set_instance_transform(i, Transform3D(Basis.IDENTITY, positions[i]))
 
-	var material := StandardMaterial3D.new()
-	material.albedo_color = PIP_COLOR.get(kind, Color.WHITE)
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	# Lifted clear of the ground rather than drawn with depth testing off.
-	# Disabling depth test forces every pip to overdraw whatever is behind it,
-	# and with thousands of them that is what turns the lens into a slideshow.
-	material.render_priority = 2
-
 	var instance := MultiMeshInstance3D.new()
 	instance.multimesh = multimesh
-	instance.material_override = material
-	instance.name = "Pips%d" % kind
+	instance.material_override = _material(kind)
+	instance.name = "Icons%d" % kind
 	instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(instance)

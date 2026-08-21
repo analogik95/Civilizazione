@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://civzgame0001"]
+[gd_scene load_steps=10 format=3 uid="uid://civzgame0001"]
 
 [ext_resource type="Script" path="res://view/game_view.gd" id="1_game"]
 [ext_resource type="Script" path="res://view/world/hex_world.gd" id="2_world"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://view/world/city_renderer.gd" id="4_cities"]
 [ext_resource type="Script" path="res://view/overlays/tile_overlay.gd" id="5_overlay"]
 [ext_resource type="Script" path="res://view/overlays/yield_lens.gd" id="8_lens"]
+[ext_resource type="Script" path="res://view/overlays/hex_grid.gd" id="9_grid"]
 [ext_resource type="Script" path="res://view/camera_rig.gd" id="6_camera"]
 [ext_resource type="Script" path="res://ui/hud/hud.gd" id="7_hud"]
 
@@ -30,6 +31,9 @@ script = ExtResource("4_cities")
 
 [node name="TileOverlay" type="Node3D" parent="."]
 script = ExtResource("5_overlay")
+
+[node name="HexGrid" type="Node3D" parent="."]
+script = ExtResource("9_grid")
 
 [node name="YieldLens" type="Node3D" parent="."]
 script = ExtResource("8_lens")

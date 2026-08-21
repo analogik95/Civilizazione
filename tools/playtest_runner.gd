@@ -59,10 +59,19 @@ func run(options: Dictionary) -> bool:
 	await _shot("turns")
 
 	# The yields lens is view state, so the only way to know it works is to turn
-	# it on and look at the result.
+	# it on and look at the result — over our own land, which is the only ground
+	# the lens draws on, since it reports what the viewing player can see.
 	view.call("_toggle_yield_lens")
 	await _settle()
 	await _shot("lens")
+	view.call("_toggle_yield_lens")
+	await _settle()
+
+	# A foreign capital at a wide zoom: the one frame that shows whether banners
+	# and flags stay readable when you pull back to look at the whole map, and
+	# whether two civilizations' colours actually tell apart.
+	await _look_at_rival(view)
+	await _shot("rival")
 
 	var human_cities: int = Game.city_count_of(0)
 	print("After %d turns: turn %d, human holds %d cities, %d units on the map." % [
@@ -131,6 +140,24 @@ func _found_capital(view: Node) -> bool:
 
 	printerr("FAIL: could not found a capital in 12 attempts")
 	return false
+
+
+## Point the camera at the nearest city that is not the human's, pulled back far
+## enough to take in the ground around it.
+func _look_at_rival(view: Node) -> void:
+	var rig: Node = view.get_node_or_null("CameraRig")
+	if rig == null:
+		return
+	for city: CityState in Game.cities.values():
+		if city.owner_id == 0:
+			continue
+		rig.call("focus_on", city.coord)
+		rig.call("set_zoom", 22.0)
+		await _settle()
+		return
+	# No rival has settled yet — still worth the wide shot of our own ground.
+	rig.call("set_zoom", 22.0)
+	await _settle()
 
 
 func _settle(frames: int = SETTLE_FRAMES) -> void:

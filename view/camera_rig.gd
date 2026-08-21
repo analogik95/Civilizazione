@@ -17,7 +17,9 @@ const PITCH_FAR := 62.0
 
 @export var bounds_margin := 6.0
 
-var _distance := 20.0
+## Boots close enough that flags, banners and tile yields are readable without
+## the player having to zoom in first.
+var _distance := 13.0
 var _dragging := false
 var _bounds := Rect2(Vector2.ZERO, Vector2.ZERO)
 
@@ -45,6 +47,14 @@ func set_map_bounds(map: MapModel) -> void:
 		Vector2(min_x - bounds_margin, min_z - bounds_margin),
 		Vector2(max_x - min_x + bounds_margin * 2.0, max_z - min_z + bounds_margin * 2.0)
 	)
+
+
+## Jump the camera to a zoom level. Used by the playtest runner to capture the
+## map at more than one distance, since flags and banners are sized to hold a
+## readable size across the whole zoom range and one screenshot cannot show that.
+func set_zoom(distance: float) -> void:
+	_distance = clampf(distance, ZOOM_MIN, ZOOM_MAX)
+	_apply()
 
 
 func focus_on(coord: Vector2i) -> void:

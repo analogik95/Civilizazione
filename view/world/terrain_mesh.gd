@@ -59,10 +59,11 @@ const CORE_RADIUS := 0.72
 ## Catlike displaces by up to 0.4 of the hex radius, reading a Perlin *texture*
 ## whose samples cover the full 0..1 range and are remapped to -1..1. Simplex
 ## noise does not behave like that — FastNoiseLite rarely returns anything near
-## +/-1, and in practice this map sees around 0.4 of the nominal range. So the
-## constant is scaled up to land in the same place: measured displacement comes
-## out near 0.3 of a hex radius, not the 0.7 the number suggests.
-const PERTURB_STRENGTH := 0.72
+## +/-1 — and the 3D sampling used for wrapping (see _field) is tamer again than
+## the 2D it replaced. So the constant does not mean what it says: read it as
+## whatever lands the *measured* mean displacement near 0.3 of a hex radius,
+## which is what this value does. Change it by measuring, not by reasoning.
+const PERTURB_STRENGTH := 0.92
 
 ## Noise frequency, tuned against the width of the blend ring.
 ##
@@ -74,6 +75,15 @@ const PERTURB_STRENGTH := 0.72
 ## dark slivers. A wavelength of several hex radii keeps each tile's vertices
 ## moving as a group while the coastline still wanders over larger scales.
 const PERTURB_FREQUENCY := 0.18
+
+## World width of one lap around a wrapping map, or 0 for a map with edges.
+##
+## The perturbation has to be periodic over this distance or the map cannot be
+## welded shut. The wrap copies are the same mesh translated by one lap, so a
+## corner shared across the seam is sampled at x and at x + span; if those give
+## different displacements the two sides pull apart and the sea shows a pale
+## crack down the join. Set by HexWorld when it builds a map.
+static var wrap_span := 0.0
 
 static var _noise_x: FastNoiseLite = null
 static var _noise_z: FastNoiseLite = null
@@ -94,15 +104,30 @@ static func _ensure_noise() -> void:
 	_noise_z.seed = 7331
 
 
+## Sample the displacement field, wrapping in x when the map does.
+##
+## On a wrapping map the field is read off a cylinder rather than off a plane:
+## x becomes an angle and the noise is sampled in 3D on a circle of matching
+## circumference. That is periodic *and* continuous — folding x with a modulo
+## would also make the two seam edges agree, but it puts a hard discontinuity
+## through the middle of the seam column, which tears those tiles instead.
+static func _field(noise: FastNoiseLite, x: float, z: float) -> float:
+	if wrap_span <= 0.0:
+		return noise.get_noise_2d(x, z)
+	var radius := wrap_span / TAU
+	var angle := x / radius
+	return noise.get_noise_3d(cos(angle) * radius, sin(angle) * radius, z)
+
+
 ## Displace a point horizontally by noise sampled at that point. Height is left
 ## alone: terrain height is decided by the tile, and nudging it here would open
 ## gaps between the ground and anything standing on it.
 static func perturb(position: Vector3) -> Vector3:
 	_ensure_noise()
 	return Vector3(
-		position.x + _noise_x.get_noise_2d(position.x, position.z) * PERTURB_STRENGTH,
+		position.x + _field(_noise_x, position.x, position.z) * PERTURB_STRENGTH,
 		position.y,
-		position.z + _noise_z.get_noise_2d(position.x, position.z) * PERTURB_STRENGTH,
+		position.z + _field(_noise_z, position.x, position.z) * PERTURB_STRENGTH,
 	)
 
 
@@ -114,7 +139,7 @@ static func tile_center(coord: Vector2i, size: float) -> Vector3:
 
 ## How far an edge vertex moves toward the average of its three tiles. 1.0 is a
 ## full average, which dissolves tile boundaries entirely.
-const EDGE_BLEND := 0.62
+const EDGE_BLEND := 0.74
 
 ## Height in world units for each terrain, before per-tile elevation noise.
 ##
@@ -171,6 +196,36 @@ const FEATURE_COLOR := {
 const MOUNTAIN_COLOR_TOP := Color(0.94, 0.95, 0.97)
 
 # -------------------------------------------------------------------------
+# Per-tile tint
+# -------------------------------------------------------------------------
+#
+# The shader already breaks the ground up with world-space noise, but that noise
+# ignores tile boundaries by design — which means a run of grassland is one
+# continuous green field with the *same* base under all of it. Civ 6's ground is
+# not that uniform: neighbouring tiles of the same terrain are visibly different
+# shades, which is what stops a continent reading as one sheet of coloured
+# paper. So each tile also gets its own small, permanent shift in hue,
+# saturation and value, keyed to its coordinate.
+#
+# The shift is applied before the corner averaging in build_land, so adjacent
+# tiles still blend into each other at their shared edge rather than butting up
+# as two flat patches.
+
+## Hue rotation, in turns. Small: enough to separate a yellow-green tile from a
+## blue-green one, not enough to make grassland look like tundra.
+const TILE_HUE := 0.014
+const TILE_SATURATION := 0.11
+const TILE_VALUE := 0.09
+
+
+## A stable -1..1 offset per tile. Two coordinate hashes rather than one so the
+## hue and value shifts are independent — a single value applied to both makes
+## every light tile also the same hue, which reads as a pattern.
+static func _tile_jitter(coord: Vector2i, salt: int) -> float:
+	var h := hash(Vector3i(coord.x, coord.y, salt * 7919))
+	return float(h % 2000) / 1000.0 - 1.0
+
+# -------------------------------------------------------------------------
 # Rock
 # -------------------------------------------------------------------------
 #
@@ -192,27 +247,55 @@ const PEAK_DRIFT := 0.34
 const CORE_JAG := 0.40
 
 ## Grey-brown cliff, snow only on the caps.
-const ROCK_LOW := Color(0.26, 0.23, 0.21)
-const ROCK_MID := Color(0.40, 0.37, 0.34)
-const ROCK_HIGH := Color(0.58, 0.56, 0.54)
-const ROCK_SNOW := Color(0.92, 0.94, 0.96)
+##
+## The spread between these is what separates a mountain from a lump. An earlier
+## ramp ran from mid-grey to near-white over a band most vertices never reached,
+## so every peak came out the same flat grey — polystyrene, not rock. The dark
+## end is now genuinely dark and the snow line sits low enough that real peaks
+## actually cross it.
+const ROCK_LOW := Color(0.20, 0.17, 0.16)
+const ROCK_MID := Color(0.37, 0.33, 0.31)
+const ROCK_HIGH := Color(0.60, 0.58, 0.56)
+const ROCK_SNOW := Color(0.94, 0.96, 0.98)
 
-## World heights the rock ramp is keyed to. Snow starts high so a mountain is
-## mostly cliff with a cap, not a white cone.
-const ROCK_BASE_Y := 0.35
-const ROCK_SNOW_Y := 3.20
+## World heights the rock ramp is keyed to.
+##
+## These must bracket the band mountain geometry actually occupies, not the
+## whole world. A mountain's inner ring sits near TERRAIN_HEIGHT.mountains plus
+## its elevation relief (about 1.8), its peak reaches PEAK_JAG above that (about
+## 2.4), and its outer corners average down toward whatever borders it (about
+## 1.1). Setting the base at 0.3 put every one of those vertices in the top
+## third of the ramp, so the whole range came out near-white — which is how a
+## ridge ends up looking like polystyrene.
+const ROCK_BASE_Y := 1.05
+const ROCK_SNOW_Y := 2.55
+
+## Per-vertex lightening on rock, so two faces of the same crag at the same
+## height are not the same grey and the facets read as facets.
+const ROCK_FACET := 0.13
 
 
 ## Cliff colour at a world height. Used for every vertex of a rocky tile, so the
 ## snow line follows the actual geometry rather than the tile it belongs to —
 ## which is why a ridge's snow runs continuously across tile boundaries.
-static func rock_color_at(y: float) -> Color:
+static func rock_color_at(y: float, facet: float = 0.0) -> Color:
 	var t := clampf((y - ROCK_BASE_Y) / maxf(ROCK_SNOW_Y - ROCK_BASE_Y, 0.001), 0.0, 1.0)
-	if t < 0.45:
-		return ROCK_LOW.lerp(ROCK_MID, t / 0.45)
-	if t < 0.86:
-		return ROCK_MID.lerp(ROCK_HIGH, (t - 0.45) / 0.41)
-	return ROCK_HIGH.lerp(ROCK_SNOW, (t - 0.86) / 0.14)
+	var colour: Color
+	if t < 0.42:
+		colour = ROCK_LOW.lerp(ROCK_MID, t / 0.42)
+	elif t < 0.76:
+		colour = ROCK_MID.lerp(ROCK_HIGH, (t - 0.42) / 0.34)
+	else:
+		colour = ROCK_HIGH.lerp(ROCK_SNOW, (t - 0.76) / 0.24)
+	if facet == 0.0:
+		return colour
+	var scale := 1.0 + facet * ROCK_FACET
+	return Color(
+		clampf(colour.r * scale, 0.0, 1.0),
+		clampf(colour.g * scale, 0.0, 1.0),
+		clampf(colour.b * scale, 0.0, 1.0),
+		colour.a
+	)
 
 
 static func is_rocky(tile: Tile) -> bool:
@@ -255,8 +338,24 @@ static func color_of(tile: Tile) -> Color:
 	if tile.terrain_id == &"mountains":
 		colour = colour.lerp(MOUNTAIN_COLOR_TOP, 0.18)
 	elif tile.is_hills:
-		colour = colour.darkened(0.06)
-	return colour
+		# Hill crowns catch the light, which is how a hill reads as raised ground
+		# from directly above — where its height alone tells you nothing.
+		colour = colour.lightened(0.07)
+	return _tinted(colour, tile.coord)
+
+
+## Give a tile its own shade of its terrain. Ice and open water are left alone:
+## a mottled ice shelf reads as damage, and the sea is drawn by its own shader.
+static func _tinted(colour: Color, coord: Vector2i) -> Color:
+	var hue_shift := _tile_jitter(coord, 1) * TILE_HUE
+	var saturation_shift := _tile_jitter(coord, 2) * TILE_SATURATION
+	var value_shift := _tile_jitter(coord, 3) * TILE_VALUE
+	return Color.from_hsv(
+		fposmod(colour.h + hue_shift, 1.0),
+		clampf(colour.s * (1.0 + saturation_shift), 0.0, 1.0),
+		clampf(colour.v * (1.0 + value_shift), 0.0, 1.0),
+		colour.a
+	)
 
 
 # -------------------------------------------------------------------------
@@ -354,7 +453,7 @@ static func build_land(map: MapModel, size: float) -> ArrayMesh:
 			apex_offset = Vector3(_jag(tile.coord, 7), 0.0, _jag(tile.coord, 8)) * PEAK_DRIFT * size
 
 		var middle := Vector3(centre.x + apex_offset.x, apex, centre.z + apex_offset.z)
-		var middle_color := colour if not rocky else rock_color_at(apex)
+		var middle_color := colour if not rocky else rock_color_at(apex, _jag(tile.coord, 9))
 
 		for i in 6:
 			var j := (i + 1) % 6
@@ -367,8 +466,12 @@ static func build_land(map: MapModel, size: float) -> ArrayMesh:
 			var inner_b := centre + offsets[j] * CORE_RADIUS
 			inner_b.y = height + (_jag(tile.coord, j + 1) * CORE_JAG if rocky else 0.0)
 
-			var inner_a_color := colour if not rocky else rock_color_at(inner_a.y)
-			var inner_b_color := colour if not rocky else rock_color_at(inner_b.y)
+			var inner_a_color := colour if not rocky else rock_color_at(
+				inner_a.y, _jag(tile.coord, i + 11)
+			)
+			var inner_b_color := colour if not rocky else rock_color_at(
+				inner_b.y, _jag(tile.coord, j + 11)
+			)
 
 			# Core.
 			_tri(surface, middle, inner_a, inner_b, middle_color, inner_a_color, inner_b_color)
@@ -417,9 +520,24 @@ static func build_land(map: MapModel, size: float) -> ArrayMesh:
 ## break up the tiles. Built once and shared.
 static var _ground_material: ShaderMaterial = null
 
+## World-space frequencies for the ground shader's three noise octaves. Held
+## here rather than read back off the material, because a ShaderMaterial only
+## reports parameters that have been set on it — the shader's own defaults are
+## not readable — and because they have to be snapped to the wrap period before
+## the first sample is ever taken.
+const GROUND_COARSE_SCALE := 0.035
+const GROUND_MEDIUM_SCALE := 0.13
+const GROUND_FINE_SCALE := 0.34
+
+static var _ground_material_span := -1.0
+
+
 static func ground_material() -> ShaderMaterial:
-	if _ground_material != null:
+	# Rebuilt when the map's lap width changes: the scales below are snapped to
+	# it, so a cached material from a differently sized map would seam.
+	if _ground_material != null and is_equal_approx(_ground_material_span, wrap_span):
 		return _ground_material
+	_ground_material_span = wrap_span
 
 	var noise := FastNoiseLite.new()
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
@@ -436,7 +554,22 @@ static func ground_material() -> ShaderMaterial:
 	_ground_material = ShaderMaterial.new()
 	_ground_material.shader = load("res://view/world/terrain.gdshader")
 	_ground_material.set_shader_parameter("noise_texture", texture)
+	# The shader samples this texture in world space, so on a wrapping map the
+	# two sides of the seam only match if the texture repeats a whole number of
+	# times per lap. Snapping each scale to the nearest one that does costs a
+	# fraction of a percent of frequency and makes the colour seam vanish.
+	_ground_material.set_shader_parameter("coarse_scale", _seam_safe_scale(GROUND_COARSE_SCALE))
+	_ground_material.set_shader_parameter("medium_scale", _seam_safe_scale(GROUND_MEDIUM_SCALE))
+	_ground_material.set_shader_parameter("fine_scale", _seam_safe_scale(GROUND_FINE_SCALE))
 	return _ground_material
+
+
+## Round a world-space texture scale so one lap spans an exact number of tiles
+## of the noise texture. Left alone on maps that do not wrap.
+static func _seam_safe_scale(scale: float) -> float:
+	if wrap_span <= 0.0 or scale <= 0.0:
+		return scale
+	return maxf(roundf(wrap_span * scale), 1.0) / wrap_span
 
 
 ## Emit one upward-facing triangle. Winding is a -> b -> c; with +Y up and
@@ -519,6 +652,15 @@ static func build_water(map: MapModel, size: float) -> ArrayMesh:
 	# distance, and each shore tile gets a ramp from beach to open water.
 	var corner_shore: Dictionary = {}
 	var corner_total: Dictionary = {}
+	# Corner heights are averaged for the same reason, and for a second one that
+	# matters more: coast, deep ocean and pack ice each sit at a different level,
+	# so giving every vertex of a tile that tile's own level opens a vertical
+	# crack at each boundary between them. You see the sky through it — a web of
+	# pale hairlines tracing hex edges across open water, which is exactly what
+	# it looked like. Averaging welds the surface shut while leaving each tile
+	# centre at its own height, so the shallows still step up visibly.
+	var corner_level: Dictionary = {}
+	var corner_level_total: Dictionary = {}
 	for tile: Tile in map.all_tiles():
 		var value := -1.0
 		if tile.is_water():
@@ -528,6 +670,9 @@ static func build_water(map: MapModel, size: float) -> ArrayMesh:
 			var key := _key(tile_centre + offsets[i])
 			corner_shore[key] = float(corner_shore.get(key, 0.0)) + value
 			corner_total[key] = int(corner_total.get(key, 0)) + 1
+			if tile.is_water():
+				corner_level[key] = float(corner_level.get(key, 0.0)) + _water_level(tile)
+				corner_level_total[key] = int(corner_level_total.get(key, 0)) + 1
 
 	for tile: Tile in map.all_tiles():
 		if not tile.is_water():
@@ -537,7 +682,7 @@ static func build_water(map: MapModel, size: float) -> ArrayMesh:
 		# colour difference gives the shallows a visible band.
 		# Land at the waterline sits at exactly 0, so the sea has to be clearly
 		# under that or the beach has no visible step at all.
-		var level: float = -0.12 if tile.terrain_id != &"ocean" else -0.17
+		var level := _water_level(tile)
 		var colour := Color.WHITE
 		var shore: float = minf(float(distance.get(tile.coord, OPEN_SEA_DISTANCE)), OPEN_SEA_DISTANCE)
 
@@ -548,7 +693,6 @@ static func build_water(map: MapModel, size: float) -> ArrayMesh:
 		var is_ice := tile.feature_id == &"ice"
 		if is_ice:
 			colour = ICE_COLOR
-			level += 0.05
 			shore = OPEN_SEA_DISTANCE
 
 		for i in 6:
@@ -557,8 +701,12 @@ static func build_water(map: MapModel, size: float) -> ArrayMesh:
 			var b := centre + offsets[j]
 			var shore_a := shore if is_ice else _corner_shore(corner_shore, corner_total, a)
 			var shore_b := shore if is_ice else _corner_shore(corner_shore, corner_total, b)
+			var level_a := _corner_shore(corner_level, corner_level_total, a)
+			var level_b := _corner_shore(corner_level, corner_level_total, b)
 			_water_tri(surface,
-				Vector3(centre.x, level, centre.z), Vector3(a.x, level, a.z), Vector3(b.x, level, b.z),
+				Vector3(centre.x, level, centre.z),
+				Vector3(a.x, level_a, a.z),
+				Vector3(b.x, level_b, b.z),
 				colour, shore, shore_a, shore_b, is_ice)
 			emitted += 1
 
@@ -567,6 +715,17 @@ static func build_water(map: MapModel, size: float) -> ArrayMesh:
 
 	surface.generate_normals()
 	return surface.commit()
+
+
+## Surface height of a water tile. Coast sits fractionally higher than deep
+## ocean, and pack ice floats above both, so the shallows and the floes read as
+## raised even before their colour is taken into account. Land at the waterline
+## sits at exactly 0, so the sea has to be clearly under that or the beach has
+## no visible step at all.
+static func _water_level(tile: Tile) -> float:
+	if tile.feature_id == &"ice":
+		return -0.07
+	return -0.12 if tile.terrain_id != &"ocean" else -0.17
 
 
 static func _corner_shore(sums: Dictionary, counts: Dictionary, position: Vector3) -> float:

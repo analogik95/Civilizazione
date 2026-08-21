@@ -463,6 +463,21 @@ func _test_rivers() -> void:
 			break
 	check(reaches_water, "at least one river reaches the sea or a lake")
 
+	# An edge with water on both sides is not a river, it is sea. These render
+	# as pale slivers stranded in open ocean, and they are wrong in the rules
+	# too: a coastal tile must not collect a river adjacency from one.
+	var drowned := 0
+	for tile: Tile in map.all_tiles():
+		if not tile.is_water():
+			continue
+		for direction in Hex.DIRECTION_COUNT:
+			if not tile.has_river_on(direction):
+				continue
+			var neighbour := map.neighbor_in(tile.coord, direction)
+			if neighbour != null and neighbour.is_water():
+				drowned += 1
+	check(drowned == 0, "no river edge has water on both sides (found %d)" % drowned)
+
 
 func _touches_water(map: MapModel, tile: Tile) -> bool:
 	if tile.is_water():

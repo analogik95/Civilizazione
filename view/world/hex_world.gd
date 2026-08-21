@@ -31,12 +31,14 @@ var _prop_layers: Dictionary = {}      # model stem -> MultiMeshInstance3D
 var _tile_instances: Dictionary = {}
 var _rivers: MeshInstance3D = null
 var _borders: MeshInstance3D = null
+var _borders_dirty := false
 
 
 func _ready() -> void:
 	EventBus.map_generated.connect(_on_map_generated)
 	EventBus.tile_changed.connect(_on_tile_changed)
-	EventBus.tile_ownership_changed.connect(func(_c: Vector2i, _o: int) -> void: refresh_borders())
+	EventBus.tile_ownership_changed.connect(
+		func(_c: Vector2i, _o: int) -> void: request_border_refresh())
 	EventBus.tile_visibility_changed.connect(_on_visibility_changed)
 
 
@@ -49,6 +51,10 @@ func build(p_map: MapModel) -> void:
 	_clear()
 	if map == null:
 		return
+
+	# The ground perturbation must know the lap width before any geometry is
+	# built, or the seam cannot weld.
+	TerrainMesh.wrap_span = wrap_offset().x
 
 	_build_ground()
 
@@ -67,6 +73,29 @@ func build(p_map: MapModel) -> void:
 	refresh_borders()
 	refresh_fog()
 	_add_wrap_copies()
+
+
+## Point a layer's wrap copies at its current mesh.
+##
+## The copies share the original's mesh *resource*, which is fine for terrain
+## that is built once — but borders are rebuilt whenever a city grows, and
+## without this the copies keep rendering the frontier from several cities ago
+## on the far side of the seam.
+func _sync_wrap_copies(original: MeshInstance3D) -> void:
+	var offset := wrap_offset()
+	if offset == Vector3.ZERO or original == null:
+		return
+	for direction in [-1.0, 1.0]:
+		var copy_name := "%s_wrap%d" % [original.name, int(direction)]
+		var copy: MeshInstance3D = get_node_or_null(NodePath(copy_name))
+		if copy == null:
+			copy = MeshInstance3D.new()
+			copy.name = copy_name
+			copy.position = offset * direction
+			copy.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			add_child(copy)
+		copy.mesh = original.mesh
+		copy.material_override = original.material_override
 
 
 func _clear() -> void:
@@ -338,6 +367,7 @@ func refresh_rivers() -> void:
 	_rivers.mesh = surface.commit()
 	_rivers.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_rivers)
+	_sync_wrap_copies(_rivers)
 
 
 ## The sea animates in the shader too, reading the shore distance baked into the
@@ -456,9 +486,44 @@ func _river_vertex(surface: SurfaceTool, position: Vector3, uv: Vector2) -> void
 	surface.add_vertex(position)
 
 
+# -------------------------------------------------------------------------
+# Territory borders
+# -------------------------------------------------------------------------
+
+## How far in from the hex edge the strip is drawn, as a fraction of the
+## circumradius. Pulled inside the tile so a player's frontier reads as *their*
+## edge and two neighbouring empires show two parallel lines rather than one
+## shared one you cannot attribute.
+##
+## The dark backing sits a little further out and is a little wider, so it shows
+## as a thin keyline on both sides of the coloured band rather than as a second
+## stripe beside it. That keyline is what keeps a dark-blue frontier visible
+## against forest and a yellow one visible against desert.
+const BORDER_INSET := 0.895
+const BORDER_WIDTH := 0.060
+const BORDER_OUTLINE_INSET := 0.945
+const BORDER_OUTLINE_WIDTH := 0.115
+const BORDER_LIFT := 0.055
+const BORDER_OUTLINE := Color(0.05, 0.06, 0.09, 0.78)
+
+
+## Ask for a border rebuild, coalescing the request to the end of the frame.
+##
+## Founding a city flips a dozen tiles at once and each flip emits
+## tile_ownership_changed, so rebuilding on the signal itself rebuilt the whole
+## border mesh a dozen times for one event.
+func request_border_refresh() -> void:
+	if _borders_dirty:
+		return
+	_borders_dirty = true
+	refresh_borders.call_deferred()
+
+
 ## Territory borders, drawn as a coloured strip along every edge where ownership
-## changes — the same read as Civ 6's dashed frontier lines.
+## changes — the outer frontier only, so the interior of an empire is open
+## ground rather than a grid of owned cells.
 func refresh_borders() -> void:
+	_borders_dirty = false
 	if _borders != null:
 		_borders.queue_free()
 	_borders = null
@@ -469,19 +534,28 @@ func refresh_borders() -> void:
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var drawn := 0
 
-	for tile: Tile in map.all_tiles():
-		if tile.owner_id < 0:
-			continue
-		if viewing_player_id >= 0 and not map.is_explored(viewing_player_id, tile.coord):
-			continue
-		var owner: PlayerState = Game.get_player(tile.owner_id)
-		var colour := owner.color_primary if owner != null else Color.WHITE
-		for direction in Hex.DIRECTION_COUNT:
-			var other := map.neighbor_in(tile.coord, direction)
-			if other != null and other.owner_id == tile.owner_id:
+	# Outline first, colour second. Neither is depth-tested, so draw order alone
+	# decides the coplanar tie and the coloured band lands on top of its own
+	# backing.
+	for pass_index in 2:
+		var width := BORDER_OUTLINE_WIDTH if pass_index == 0 else BORDER_WIDTH
+		var inset := BORDER_OUTLINE_INSET if pass_index == 0 else BORDER_INSET
+		var lift := BORDER_LIFT if pass_index == 0 else BORDER_LIFT + 0.004
+		for tile: Tile in map.all_tiles():
+			if tile.owner_id < 0:
 				continue
-			_add_border_edge(surface, tile, direction, colour)
-			drawn += 1
+			if viewing_player_id >= 0 and not map.is_explored(viewing_player_id, tile.coord):
+				continue
+			var colour := BORDER_OUTLINE
+			if pass_index == 1:
+				var owner: PlayerState = Game.get_player(tile.owner_id)
+				colour = owner.color_primary if owner != null else Color.WHITE
+			for direction in Hex.DIRECTION_COUNT:
+				var other := map.neighbor_in(tile.coord, direction)
+				if other != null and other.owner_id == tile.owner_id:
+					continue
+				_add_border_edge(surface, tile, direction, colour, width, inset, lift)
+				drawn += 1
 
 	if drawn == 0:
 		return
@@ -489,35 +563,87 @@ func refresh_borders() -> void:
 	var material := StandardMaterial3D.new()
 	material.vertex_color_use_as_albedo = true
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# Drawn over the ground rather than on it.
+	#
+	# A border strip laid on the terrain sinks into it: the band sits between a
+	# tile's flat core and its blended rim, where the ground is a slope, and any
+	# single height for the strip is under that slope somewhere. Chasing the
+	# exact surface is not worth it — whose land you are standing in is
+	# information the player must never lose to a hill, so the frontier is drawn
+	# unconditionally on top, which is also how Civ 6 reads it.
+	material.no_depth_test = true
+	material.render_priority = 1
+	# A flat strip laid on the ground has no meaningful facing, and the offset
+	# that pushes it inside its own hex flips the winding depending on which way
+	# the edge runs — so half of them, or all of them, get back-face culled.
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	surface.set_material(material)
 
 	_borders = MeshInstance3D.new()
 	_borders.name = "Borders"
 	_borders.mesh = surface.commit()
+	_borders.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_borders)
+	_sync_wrap_copies(_borders)
 
 
-func _add_border_edge(surface: SurfaceTool, tile: Tile, direction: int, colour: Color) -> void:
+## One quad along a hex edge, following the ground.
+##
+## The corner pair comes from Hex.edge_corners, the same helper the river tracer
+## and the grid overlay use. Deriving it independently as `angle ± 30°` — which
+## this did — picks a *rotated* edge: the border was drawn one edge round from
+## the boundary it was meant to mark, which is the identical bug that put river
+## segments on the wrong side of their tiles.
+func _add_border_edge(
+	surface: SurfaceTool, tile: Tile, direction: int, colour: Color,
+	width: float, inset: float, lift: float
+) -> void:
 	var centre := Hex.to_world(tile.coord, ArtPalette.HEX_SIZE)
-	var height := TerrainMesh.surface_height(tile) + 0.04
+	var pair := Hex.edge_corners(direction)
+	var fallback := TerrainMesh.surface_height(tile)
 
-	var angle := PI / 3.0 * direction
-	var a := centre + Vector3(
-		cos(angle - PI / 6.0), 0.0, sin(angle - PI / 6.0)
-	) * ArtPalette.HEX_SIZE * 0.94
-	var b := centre + Vector3(
-		cos(angle + PI / 6.0), 0.0, sin(angle + PI / 6.0)
-	) * ArtPalette.HEX_SIZE * 0.94
+	var corner_a := centre + Hex.corner_offset(pair.x, ArtPalette.HEX_SIZE)
+	var corner_b := centre + Hex.corner_offset(pair.y, ArtPalette.HEX_SIZE)
 
+	# Work in perturbed space. The ground mesh displaces its corner vertices by
+	# noise sampled at the *corner*, so insetting first and perturbing after
+	# samples the noise somewhere else and slides the strip off the edge it is
+	# supposed to trace.
+	var hub := TerrainMesh.perturb(centre)
+	var end_a := TerrainMesh.perturb(corner_a)
+	var end_b := TerrainMesh.perturb(corner_b)
+	if tile.is_water():
+		# A coastal city owns the sea around it, so borders do run over water —
+		# but the welded corner height out there is the *sea floor*, a good half
+		# unit below the surface. Following it drowned the whole band.
+		end_a.y = fallback + lift
+		end_b.y = fallback + lift
+	else:
+		# Split the difference between the tile's flat core height and its
+		# welded corner: the band lies across the ring that joins them.
+		var flat := TerrainMesh.height_of(tile)
+		end_a.y = lerpf(flat, TerrainMesh.corner_height_at(corner_a, fallback), 0.5) + lift
+		end_b.y = lerpf(flat, TerrainMesh.corner_height_at(corner_b, fallback), 0.5) + lift
+
+	# Pull the ends back toward the tile centre so the strips of two adjacent
+	# owned tiles meet at a mitre rather than crossing at the shared corner.
+	var pull := 1.0 - inset
+	var a := end_a.lerp(Vector3(hub.x, end_a.y, hub.z), pull)
+	var b := end_b.lerp(Vector3(hub.x, end_b.y, hub.z), pull)
+
+	# Offset across the edge, toward the owner's own hex, so the band lies
+	# inside the territory it marks.
 	var along := (b - a).normalized()
-	var across := along.cross(Vector3.UP).normalized() * 0.05
+	var across := along.cross(Vector3.UP).normalized() * width
+	if across.dot(hub - (a + b) * 0.5) < 0.0:
+		across = -across
 
 	surface.set_color(colour)
-	var p0 := TerrainMesh.perturb(Vector3(a.x, height, a.z) - across)
-	var p1 := TerrainMesh.perturb(Vector3(a.x, height, a.z) + across)
-	var p2 := TerrainMesh.perturb(Vector3(b.x, height, b.z) + across)
-	var p3 := TerrainMesh.perturb(Vector3(b.x, height, b.z) - across)
-
+	var p0 := a
+	var p1 := a + across
+	var p2 := b + across
+	var p3 := b
 	surface.add_vertex(p0); surface.add_vertex(p1); surface.add_vertex(p2)
 	surface.add_vertex(p0); surface.add_vertex(p2); surface.add_vertex(p3)
 
@@ -551,6 +677,9 @@ func _add_wrap_copies() -> void:
 
 	var originals: Array[Node] = []
 	for child in get_children():
+		# Never copy a copy: this runs again whenever a layer is rebuilt.
+		if str(child.name).contains("_wrap"):
+			continue
 		if child is MeshInstance3D or child is MultiMeshInstance3D:
 			originals.append(child)
 
