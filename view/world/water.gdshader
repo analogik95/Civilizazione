@@ -19,10 +19,10 @@ uniform sampler2D wave_noise : hint_default_white, repeat_enable, filter_linear;
 
 uniform vec3 shallow_color : source_color = vec3(0.22, 0.60, 0.78);
 uniform vec3 deep_color : source_color = vec3(0.06, 0.20, 0.42);
-uniform vec3 foam_color : source_color = vec3(0.92, 0.97, 1.0);
+uniform vec3 foam_color : source_color = vec3(0.86, 0.94, 0.99);
 
 // How far out from land, in tiles, foam is still visible.
-uniform float foam_reach = 0.5;
+uniform float foam_reach = 0.34;
 uniform float wave_speed = 0.35;
 uniform float wave_scale = 3.5;
 uniform float noise_scale = 0.09;
@@ -49,12 +49,12 @@ void fragment() {
 	// tutorial uses sqrt, which widens it instead — right for its scale, where a
 	// cell is ten units across and the shore mesh is a dedicated strip, but here
 	// it washed two full tiles of open sea white.
-	float foam = band * band * crest;
+	float foam = band * band * crest * 0.8;
 	// A solid lip right at the waterline, so the coast always reads as an edge
 	// even when the waves are at a trough.
 	// A tighter lip right at the waterline so the coast always reads as an edge,
 	// but only in the last fraction of a tile — a wider one floods the shelf.
-	foam = max(foam, smoothstep(0.0, -0.4, shore) * 0.8);
+	foam = max(foam, smoothstep(-0.05, -0.45, shore) * 0.62);
 
 	vec3 water = mix(shallow_color, deep_color, smoothstep(0.0, 3.0, shore));
 	vec3 albedo = mix(water, foam_color, clamp(foam, 0.0, 1.0));

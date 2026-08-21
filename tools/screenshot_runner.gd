@@ -110,6 +110,24 @@ func _print_terrain_census() -> void:
 				river_edges += 1
 	print("    river tiles  %5d, river edges %5d" % [river_tiles, river_edges])
 
+	# Land must never render below the sea. This caught the elevation-scale bug
+	# where the generator emitted raw noise and the renderer assumed 0..1.
+	var lowest_land := INF
+	var highest_water := -INF
+	var land_elevation_min := INF
+	var land_elevation_max := -INF
+	for tile: Tile in Game.map.all_tiles():
+		if tile.is_water():
+			highest_water = maxf(highest_water, TerrainMesh.surface_height(tile))
+		else:
+			lowest_land = minf(lowest_land, TerrainMesh.surface_height(tile))
+			land_elevation_min = minf(land_elevation_min, tile.elevation)
+			land_elevation_max = maxf(land_elevation_max, tile.elevation)
+	print("    land elevation %.3f..%.3f | lowest land y %.3f, highest water y %.3f%s" % [
+		land_elevation_min, land_elevation_max, lowest_land, highest_water,
+		"" if lowest_land > highest_water else "   <-- SEA ABOVE LAND",
+	])
+
 
 ## Aim at the busiest part of the map: the largest city if any has been founded,
 ## otherwise wherever the most units are standing. Framing the geometric centre

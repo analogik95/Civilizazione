@@ -236,10 +236,13 @@ static func height_of(tile: Tile) -> float:
 	var height: float = TERRAIN_HEIGHT.get(tile.terrain_id, 0.0)
 	if tile.is_hills:
 		height += HILL_HEIGHT
-	# Elevation is 0..1 from the generator. Only land takes relief from it;
-	# blending the sea floor upward would poke it through the water plane.
+	# Elevation is 0 at the waterline and 1 at the highest land. Only land takes
+	# relief from it; lifting the sea floor would poke it through the water
+	# plane. This used to remap as (elevation - 0.5), which assumed a 0..1 field
+	# the generator was not actually producing, and put most coastal land
+	# *below* sea level — so the sea rendered standing above the beach.
 	if not tile.is_water():
-		height += (tile.elevation - 0.5) * 2.0 * ELEVATION_RELIEF
+		height += maxf(tile.elevation, 0.0) * ELEVATION_RELIEF
 	return height
 
 
@@ -522,7 +525,9 @@ static func build_water(map: MapModel, size: float) -> ArrayMesh:
 		var centre := Hex.to_world(tile.coord, size)
 		# Coast sits fractionally higher than deep ocean, which combined with the
 		# colour difference gives the shallows a visible band.
-		var level: float = -0.06 if tile.terrain_id != &"ocean" else -0.09
+		# Land at the waterline sits at exactly 0, so the sea has to be clearly
+		# under that or the beach has no visible step at all.
+		var level: float = -0.12 if tile.terrain_id != &"ocean" else -0.17
 		var colour := Color.WHITE
 		var shore: float = minf(float(distance.get(tile.coord, OPEN_SEA_DISTANCE)), OPEN_SEA_DISTANCE)
 
@@ -585,5 +590,5 @@ static func surface_height(tile: Tile) -> float:
 	if tile == null:
 		return 0.0
 	if tile.is_water():
-		return -0.06
+		return -0.12
 	return height_of(tile)

@@ -136,7 +136,7 @@ func _bucket_props(tile: Tile, buckets: Dictionary) -> void:
 			_prop_transform(tile, _scatter(rng, 0.62), rng.randf_range(0.0, TAU), surface),
 			ArtPalette.SHORE_ROCK_SCALE)
 
-	var spec := ArtPalette.feature_props(tile)
+	var spec := ArtPalette.feature_props(tile) if tile.is_land() else {}
 	if not spec.is_empty():
 		var models: Array = spec["models"]
 		for i in int(spec["count"]):
@@ -146,12 +146,15 @@ func _bucket_props(tile: Tile, buckets: Dictionary) -> void:
 			_add_prop(buckets, "features", stem, tile,
 				_prop_transform(tile, offset, rng.randf_range(0.0, TAU), surface), scale)
 
-	if tile.resource_id != &"":
+	# Marine resources — Fish, Crabs, Pearls, Whales — sit on water tiles, and the
+	# resource models are all land props. Planting one on the sea puts a flower
+	# bobbing in the ocean, so water resources are left to the UI to indicate.
+	if tile.resource_id != &"" and tile.is_land():
 		_add_prop(buckets, "resources", ArtPalette.resource_model(tile.resource_id), tile,
 			_prop_transform(tile, Vector3(0.0, 0.0, 0.22), 0.0, surface),
 			ArtPalette.RESOURCE_SCALE)
 
-	if tile.improvement_id != &"" and not tile.is_pillaged:
+	if tile.improvement_id != &"" and not tile.is_pillaged and tile.is_land():
 		var improvement := ArtPalette.improvement_model(tile.improvement_id)
 		if improvement != "":
 			_add_prop(buckets, "improvements", improvement, tile,

@@ -113,6 +113,26 @@ func _assign_land_and_sea() -> void:
 	elevations.sort()
 	var index := int(elevations.size() * (1.0 - LAND_FRACTION))
 	var sea_level: float = elevations[clampi(index, 0, elevations.size() - 1)]
+
+	# Rescale elevation so it means something absolute: 0 at the waterline, 1 at
+	# the highest land, negative under the sea.
+	#
+	# Until now this held raw noise, roughly -1.5..1 with the shoreline wherever
+	# the land fraction happened to put it. Every consumer then had to guess a
+	# range, and they guessed differently — the renderer assumed 0..1 and placed
+	# land at (elevation - 0.5), which for a typical coastal tile came out below
+	# the water plane and drew the sea standing above the beach. Normalising once
+	# here means elevation reads the same to the climate model, the renderer and
+	# the AI.
+	var highest := sea_level
+	for value in elevations:
+		highest = maxf(highest, value)
+	var span := maxf(highest - sea_level, 0.0001)
+
+	for tile: Tile in map.tiles.values():
+		tile.elevation = (tile.elevation - sea_level) / span
+
+	sea_level = 0.0
 	_sea_level = sea_level
 
 	for tile: Tile in map.tiles.values():

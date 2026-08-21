@@ -150,7 +150,10 @@ const HILL_SCALE := 1.55
 const SHORE_ROCK_SCALE := 0.42
 
 ## Chance a coastal land tile grows a rock formation.
-const SHORE_ROCK_CHANCE := 0.34
+## Shore rocks are punctuation, not ground cover. At a third of coastal tiles
+## they read as scattered debris strewn over the grass rather than as an
+## occasional outcrop at the waterline.
+const SHORE_ROCK_CHANCE := 0.08
 
 
 ## Deterministic variant choice — the same tile must pick the same model every
