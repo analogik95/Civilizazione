@@ -28,11 +28,31 @@ extends RefCounted
 ## bit-identical, so they are snapped to a grid before being used as a key.
 const WELD := 1000.0
 
-## Fraction of the tile that stays flat at its own height and colour. The rest
-## is the blend ring out to the shared corners. Catlike Coding's hex map series
-## settles on 0.75 for the same split; much below that and the flat core gets
-## too small to read as a tile.
-const CORE_RADIUS := 0.72
+## Fraction of the tile that stays flat at its own height and colour.
+##
+## Catlike Coding settles on 0.75 and this did too, on the reasoning that a 4X
+## player is choosing tiles and each one must read as itself. Comparing the
+## result against Civilization VI shows that reasoning is simply wrong: Civ 6's
+## ground has *no* visible hexagons anywhere. It is one continuous rolling
+## landscape, and tile identity comes from what stands on the land — props,
+## improvements, borders, an optional grid overlay — never from the land's own
+## colour. A 0.72 core is what made this map read as coloured paper hexagons.
+##
+## Small enough now that the flat part is a hint of a plateau rather than a
+## facet, with the rest a smooth ramp to the shared rim.
+const CORE_RADIUS := 0.26
+
+## Rings of geometry between the flat core and the rim.
+##
+## The blend has to be *geometry*, not just vertex colours across one big
+## triangle: with a single ring the shading gradient is linear over the whole
+## half-tile and the eye reads the change of slope at the ring boundary as an
+## edge. Three rings is where the banding stops being visible.
+const RIM_RINGS := 3
+
+## How far out the tile keeps its own colour before crossing to its neighbour's.
+## Higher than CORE_RADIUS on purpose — see _fan_vertex.
+const COLOR_HOLD := 0.52
 
 # -------------------------------------------------------------------------
 # Perturbation
@@ -137,9 +157,11 @@ static func tile_center(coord: Vector2i, size: float) -> Vector3:
 	var centre := Hex.to_world(coord, size)
 	return perturb(centre)
 
-## How far an edge vertex moves toward the average of its three tiles. 1.0 is a
-## full average, which dissolves tile boundaries entirely.
-const EDGE_BLEND := 0.74
+# The rim blend used to be a tunable (EDGE_BLEND, last set to 0.74). It cannot
+# be: a rim vertex is shared with the neighbouring tile, so anything short of a
+# full average gives the two tiles different colours at the same point and draws
+# a seam along every edge. Dissolving the tile boundary is the goal, not a side
+# effect — see CORE_RADIUS.
 
 ## Height in world units for each terrain, before per-tile elevation noise.
 ##
@@ -149,48 +171,53 @@ const EDGE_BLEND := 0.74
 const TERRAIN_HEIGHT := {
 	&"ocean": -0.50, &"coast": -0.20, &"lake": -0.16,
 	&"grassland": 0.0, &"plains": 0.02, &"desert": 0.0,
-	&"tundra": 0.04, &"snow": 0.08, &"mountains": 1.55,
+	&"tundra": 0.04, &"snow": 0.08, &"mountains": 2.30,
 }
 
 const HILL_HEIGHT := 0.62
 
-## How much of the generator's own elevation field shows through. Keeps a
-## continent from being a uniform slab without letting it fight the terrain
-## heights above.
-const ELEVATION_RELIEF := 0.42
+## How much of the generator's own elevation field shows through.
+##
+## Was 0.42, which over a tile two units across is a gradient of a few degrees —
+## invisible. Civ 6's ground visibly rolls: you can see valleys and highland
+## from the shading alone, before any mountain is involved. Now that the mesh is
+## smooth rather than stepped there is nothing to fight, so the field can drive
+## real relief.
+const ELEVATION_RELIEF := 0.95
 
 ## Base colours. These replace the kit's texture atlas entirely for the ground —
 ## a continuous mesh cannot use per-tile textured blocks — so they carry the
 ## whole look of the landscape.
+## Measured against Civ 6, not picked by eye. Averaged over a land region its
+## ground comes out around RGB (141,134,85) — red marginally *above* green and
+## blue far below both, a warm khaki world. These were green-dominant, which is
+## most of why the two look nothing alike side by side.
 const TERRAIN_COLOR := {
-	&"grassland": Color(0.33, 0.54, 0.20),
-	&"plains": Color(0.66, 0.58, 0.26),
-	&"desert": Color(0.84, 0.71, 0.42),
-	&"tundra": Color(0.55, 0.55, 0.45),
-	&"snow": Color(0.80, 0.84, 0.89),
+	# Grassland stays green. The measured *average* of a Civ 6 land region is
+	# warm khaki, but that average is a map with tan plains and pale desert in
+	# it — not a map where everything is khaki. Matching the average by making
+	# every biome yellow produced one flat mustard continent, which is further
+	# from the reference than the green one was.
+	&"grassland": Color(0.40, 0.53, 0.19),
+	&"plains": Color(0.68, 0.58, 0.27),
+	&"desert": Color(0.84, 0.74, 0.47),
+	&"tundra": Color(0.56, 0.53, 0.41),
+	&"snow": Color(0.76, 0.79, 0.83),
 	&"mountains": Color(0.46, 0.44, 0.43),
-	&"coast": Color(0.20, 0.52, 0.70),
-	&"ocean": Color(0.09, 0.26, 0.47),
-	&"lake": Color(0.22, 0.54, 0.74),
+	&"coast": Color(0.16, 0.42, 0.58),
+	&"ocean": Color(0.06, 0.18, 0.36),
+	&"lake": Color(0.17, 0.44, 0.62),
 }
-
-## Civilization VI draws no hex grid on the ground at all. The terrain is one
-## organic field, and the grid is implied by borders, districts and
-## improvements — by what is *on* the land rather than by the land itself.
-## Darkening tile edges here was making every hex read as a discrete patch, so
-## edges are left unshaded and the grid is drawn as a toggleable overlay
-## instead, the way the real game does it.
-const EDGE_SHADE := 1.0
 
 ## Features recolour the ground under them, the way Civ 6 darkens a Woods tile
 ## rather than only planting trees on it.
 const FEATURE_COLOR := {
-	&"woods": Color(0.26, 0.44, 0.20),
-	&"rainforest": Color(0.20, 0.44, 0.20),
-	&"marsh": Color(0.36, 0.46, 0.30),
-	&"floodplains": Color(0.52, 0.66, 0.30),
-	&"oasis": Color(0.46, 0.66, 0.34),
-	&"ice": Color(0.88, 0.93, 0.97),
+	&"woods": Color(0.24, 0.35, 0.13),
+	&"rainforest": Color(0.20, 0.33, 0.13),
+	&"marsh": Color(0.38, 0.44, 0.26),
+	&"floodplains": Color(0.58, 0.64, 0.28),
+	&"oasis": Color(0.50, 0.64, 0.30),
+	&"ice": Color(0.82, 0.87, 0.92),
 }
 
 const MOUNTAIN_COLOR_TOP := Color(0.94, 0.95, 0.97)
@@ -214,8 +241,8 @@ const MOUNTAIN_COLOR_TOP := Color(0.94, 0.95, 0.97)
 ## Hue rotation, in turns. Small: enough to separate a yellow-green tile from a
 ## blue-green one, not enough to make grassland look like tundra.
 const TILE_HUE := 0.014
-const TILE_SATURATION := 0.11
-const TILE_VALUE := 0.09
+const TILE_SATURATION := 0.08
+const TILE_VALUE := 0.07
 
 
 ## A stable -1..1 offset per tile. Two coordinate hashes rather than one so the
@@ -240,11 +267,26 @@ static func _tile_jitter(coord: Vector2i, salt: int) -> float:
 # rebuilds and two tiles always agree about the corner they share.
 
 ## Extra height on the peak vertex, in world units.
-const PEAK_JAG := 0.62
+const PEAK_JAG := 0.95
 ## How far the peak slides off the tile centre, in tile radii.
 const PEAK_DRIFT := 0.34
-## Height variation around the inner ring, which is what facets the sides.
-const CORE_JAG := 0.40
+
+## Ridges, not noise.
+##
+## Randomising every spoke independently gives a crumpled paper bag: lots of
+## detail, no structure, and nothing that reads as a mountain. Real peaks have a
+## handful of major ridges running from the summit to the base with gullies
+## between them, so the variation around the tile is a low-frequency wave —
+## three ridges per peak, phase-shifted per tile so no two are alike — with a
+## little noise on top for texture.
+const RIDGE_COUNT := 3.0
+const RIDGE_DEPTH := 0.62
+const CORE_JAG := 0.16
+
+## How steeply the flanks fall away. Below 1 the profile is convex — a steep
+## shoulder under a sharp summit, rather than the smooth dome a linear ramp
+## gives.
+const PEAK_FALLOFF := 0.62
 
 ## Grey-brown cliff, snow only on the caps.
 ##
@@ -253,22 +295,20 @@ const CORE_JAG := 0.40
 ## so every peak came out the same flat grey — polystyrene, not rock. The dark
 ## end is now genuinely dark and the snow line sits low enough that real peaks
 ## actually cross it.
-const ROCK_LOW := Color(0.20, 0.17, 0.16)
-const ROCK_MID := Color(0.37, 0.33, 0.31)
-const ROCK_HIGH := Color(0.60, 0.58, 0.56)
-const ROCK_SNOW := Color(0.94, 0.96, 0.98)
+const ROCK_LOW := Color(0.33, 0.30, 0.29)
+const ROCK_MID := Color(0.47, 0.45, 0.45)
+const ROCK_HIGH := Color(0.64, 0.63, 0.64)
+const ROCK_SNOW := Color(0.93, 0.95, 0.97)
 
-## World heights the rock ramp is keyed to.
+## The rock ramp, expressed relative to the mountain's own base height.
 ##
-## These must bracket the band mountain geometry actually occupies, not the
-## whole world. A mountain's inner ring sits near TERRAIN_HEIGHT.mountains plus
-## its elevation relief (about 1.8), its peak reaches PEAK_JAG above that (about
-## 2.4), and its outer corners average down toward whatever borders it (about
-## 1.1). Setting the base at 0.3 put every one of those vertices in the top
-## third of the ramp, so the whole range came out near-white — which is how a
-## ridge ends up looking like polystyrene.
-const ROCK_BASE_Y := 1.05
-const ROCK_SNOW_Y := 2.55
+## Absolute world heights were tried twice and mis-set twice: the band that
+## mountain geometry occupies moves whenever TERRAIN_HEIGHT or ELEVATION_RELIEF
+## changes, so a ramp pinned to fixed Y values silently drifts until every peak
+## is uniformly black or uniformly white. Measuring from the tile's own base
+## makes it immune to that. SKIRT is how far below the base the ramp starts —
+## roughly where a mountain meets the land around it.
+const ROCK_SKIRT := 1.30
 
 ## Per-vertex lightening on rock, so two faces of the same crag at the same
 ## height are not the same grey and the facets read as facets.
@@ -278,15 +318,17 @@ const ROCK_FACET := 0.13
 ## Cliff colour at a world height. Used for every vertex of a rocky tile, so the
 ## snow line follows the actual geometry rather than the tile it belongs to —
 ## which is why a ridge's snow runs continuously across tile boundaries.
-static func rock_color_at(y: float, facet: float = 0.0) -> Color:
-	var t := clampf((y - ROCK_BASE_Y) / maxf(ROCK_SNOW_Y - ROCK_BASE_Y, 0.001), 0.0, 1.0)
+static func rock_color_at(y: float, base: float, facet: float = 0.0) -> Color:
+	var low := base - ROCK_SKIRT
+	var high := base + PEAK_JAG
+	var t := clampf((y - low) / maxf(high - low, 0.001), 0.0, 1.0)
 	var colour: Color
 	if t < 0.42:
 		colour = ROCK_LOW.lerp(ROCK_MID, t / 0.42)
-	elif t < 0.76:
-		colour = ROCK_MID.lerp(ROCK_HIGH, (t - 0.42) / 0.34)
+	elif t < 0.68:
+		colour = ROCK_MID.lerp(ROCK_HIGH, (t - 0.42) / 0.26)
 	else:
-		colour = ROCK_HIGH.lerp(ROCK_SNOW, (t - 0.76) / 0.24)
+		colour = ROCK_HIGH.lerp(ROCK_SNOW, (t - 0.68) / 0.32)
 	if facet == 0.0:
 		return colour
 	var scale := 1.0 + facet * ROCK_FACET
@@ -311,7 +353,7 @@ static func _jag(coord: Vector2i, index: int) -> float:
 
 ## Pack ice on polar water. Opaque, and slightly blue so it separates from the
 ## snow terrain it usually borders.
-const ICE_COLOR := Color(0.84, 0.89, 0.94, 1.0)
+const ICE_COLOR := Color(0.78, 0.84, 0.90, 1.0)
 
 
 ## Height of a tile's centre vertex.
@@ -405,7 +447,15 @@ static func corner_height_at(position: Vector3, fallback: float) -> float:
 static func build_land(map: MapModel, size: float) -> ArrayMesh:
 	var offsets := corner_offsets(size)
 
-	# Pass one: accumulate every hex's contribution to each shared corner.
+	# Pass one: accumulate every hex's contribution to the points it shares with
+	# its neighbours — the six corners, shared with two other tiles each, and the
+	# six edge midpoints, shared with one.
+	#
+	# The midpoints are what make the surface genuinely smooth. Without them a
+	# tile edge is a straight chord between two corner heights while the tile on
+	# the other side draws the same chord, so the two agree — but the *slope*
+	# changes across it, and a crease in the shading is exactly as legible as a
+	# drawn line. Six more shared points turn each crease into a curve.
 	var corner_height: Dictionary = {}
 	var corner_color: Dictionary = {}
 	var corner_count: Dictionary = {}
@@ -415,22 +465,21 @@ static func build_land(map: MapModel, size: float) -> ArrayMesh:
 		var height := height_of(tile)
 		var colour := color_of(tile)
 		for i in 6:
-			var key := _key(centre + offsets[i])
-			corner_height[key] = float(corner_height.get(key, 0.0)) + height
-			corner_color[key] = (corner_color.get(key, Color(0, 0, 0, 0)) as Color) + colour
-			corner_count[key] = int(corner_count.get(key, 0)) + 1
+			var j := (i + 1) % 6
+			for point: Vector3 in [
+				centre + offsets[i],
+				centre + (offsets[i] + offsets[j]) * 0.5,
+			]:
+				var key := _key(point)
+				corner_height[key] = float(corner_height.get(key, 0.0)) + height
+				corner_color[key] = (corner_color.get(key, Color(0, 0, 0, 0)) as Color) + colour
+				corner_count[key] = int(corner_count.get(key, 0)) + 1
 
 	corner_heights.clear()
 	for key: Variant in corner_height:
 		corner_heights[key] = float(corner_height[key]) / float(corner_count[key])
 
-	# Pass two: each tile is a flat core plus a blend ring.
-	#
-	# Averaging every vertex would smooth the map into mush, with no tile
-	# readable as itself — and a 4X map has to stay legible, because the player
-	# is choosing which tile to work. So the inner hexagon keeps the tile's own
-	# flat height and colour, and only the outer ring interpolates to the shared
-	# corners. That is the Civ 6 compromise: flat readable ground, soft seams.
+	# Pass two: each tile is a small flat core and a fan of rings out to the rim.
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var emitted := 0
@@ -452,61 +501,58 @@ static func build_land(map: MapModel, size: float) -> ArrayMesh:
 			apex += _jag(tile.coord, 0) * PEAK_JAG
 			apex_offset = Vector3(_jag(tile.coord, 7), 0.0, _jag(tile.coord, 8)) * PEAK_DRIFT * size
 
+		var base_height := height
 		var middle := Vector3(centre.x + apex_offset.x, apex, centre.z + apex_offset.z)
-		var middle_color := colour if not rocky else rock_color_at(apex, _jag(tile.coord, 9))
+		var middle_color := colour if not rocky else rock_color_at(apex, height, _jag(tile.coord, 9))
 
+		# The twelve rim directions, alternating corner and edge midpoint. Their
+		# heights and colours are the shared averages, so two tiles always agree
+		# about the boundary between them.
+		var rim: Array = []
 		for i in 6:
 			var j := (i + 1) % 6
+			for point: Vector3 in [
+				centre + offsets[i],
+				centre + (offsets[i] + offsets[j]) * 0.5,
+			]:
+				var key := _key(point)
+				var rim_y := float(corner_height[key]) / float(corner_count[key])
+				var rim_color: Color = (
+					rock_color_at(rim_y, height) if rocky
+					else (corner_color[key] as Color) / float(corner_count[key])
+				)
+				rim.append([point - centre, rim_y, rim_color])
 
-			# On rocky tiles the inner ring varies per corner, which is what turns
-			# a smooth dome into a faceted crag. On everything else it stays flat,
-			# so ordinary terrain keeps its readable tile core.
-			var inner_a := centre + offsets[i] * CORE_RADIUS
-			inner_a.y = height + (_jag(tile.coord, i + 1) * CORE_JAG if rocky else 0.0)
-			var inner_b := centre + offsets[j] * CORE_RADIUS
-			inner_b.y = height + (_jag(tile.coord, j + 1) * CORE_JAG if rocky else 0.0)
+		for k in 12:
+			var a: Array = rim[k]
+			var b: Array = rim[(k + 1) % 12]
 
-			var inner_a_color := colour if not rocky else rock_color_at(
-				inner_a.y, _jag(tile.coord, i + 11)
+			# Core: a twelve-sided sliver at the tile's own height and colour.
+			var core_a := _fan_vertex(
+				centre, a, middle.y, middle_color, tile, k, CORE_RADIUS, rocky, base_height
 			)
-			var inner_b_color := colour if not rocky else rock_color_at(
-				inner_b.y, _jag(tile.coord, j + 11)
+			var core_b := _fan_vertex(
+				centre, b, middle.y, middle_color, tile, k + 1, CORE_RADIUS, rocky, base_height
 			)
+			_tri(surface, middle, core_a[0], core_b[0], middle_color, core_a[1], core_b[1])
+			emitted += 1
 
-			# Core.
-			_tri(surface, middle, inner_a, inner_b, middle_color, inner_a_color, inner_b_color)
-
-			var a_key := _key(centre + offsets[i])
-			var b_key := _key(centre + offsets[j])
-			var outer_a := centre + offsets[i]
-			outer_a.y = float(corner_height[a_key]) / float(corner_count[a_key])
-			var outer_b := centre + offsets[j]
-			outer_b.y = float(corner_height[b_key]) / float(corner_count[b_key])
-
-			# Corners average all three touching tiles, which washes the tile's
-			# own identity out of its edge. Pulling the blend back toward this
-			# tile keeps the transition soft without dissolving the boundary.
-			#
-			# On rock this averaging is the whole point: it is what makes two
-			# adjacent mountain hexes share a corner height and flow into one
-			# unbroken ridge, instead of standing as two separate peaks.
-			var a_color: Color
-			var b_color: Color
-			if rocky:
-				a_color = rock_color_at(outer_a.y)
-				b_color = rock_color_at(outer_b.y)
-			else:
-				a_color = colour.lerp(
-					(corner_color[a_key] as Color) / float(corner_count[a_key]), EDGE_BLEND
-				).darkened(1.0 - EDGE_SHADE)
-				b_color = colour.lerp(
-					(corner_color[b_key] as Color) / float(corner_count[b_key]), EDGE_BLEND
-				).darkened(1.0 - EDGE_SHADE)
-
-			# Blend ring, as two triangles.
-			_tri(surface, inner_a, outer_a, outer_b, inner_a_color, a_color, b_color)
-			_tri(surface, inner_a, outer_b, inner_b, inner_a_color, b_color, inner_b_color)
-			emitted += 3
+			# Rings out to the rim.
+			var inner_a := core_a
+			var inner_b := core_b
+			for ring in RIM_RINGS:
+				var t := CORE_RADIUS + (1.0 - CORE_RADIUS) * float(ring + 1) / float(RIM_RINGS)
+				var outer_a := _fan_vertex(
+					centre, a, middle.y, middle_color, tile, k, t, rocky, base_height
+				)
+				var outer_b := _fan_vertex(
+					centre, b, middle.y, middle_color, tile, k + 1, t, rocky, base_height
+				)
+				_tri(surface, inner_a[0], outer_a[0], outer_b[0], inner_a[1], outer_a[1], outer_b[1])
+				_tri(surface, inner_a[0], outer_b[0], inner_b[0], inner_a[1], outer_b[1], inner_b[1])
+				emitted += 2
+				inner_a = outer_a
+				inner_b = outer_b
 
 	if emitted == 0:
 		return null
@@ -514,6 +560,52 @@ static func build_land(map: MapModel, size: float) -> ArrayMesh:
 	surface.generate_normals()
 	surface.set_material(ground_material())
 	return surface.commit()
+
+
+## One vertex along the ray from a tile centre to one of its rim points.
+##
+## `t` runs 0 at the centre to 1 at the rim. Height and colour ease from the
+## tile's own values to the shared rim values, so the surface is continuous
+## across every edge and has no flat facet to give the hexagon away.
+static func _fan_vertex(
+	centre: Vector3, rim: Array, core_y: float, core_color: Color,
+	tile: Tile, spoke: int, t: float, rocky: bool, base: float
+) -> Array:
+	var direction: Vector3 = rim[0]
+	var rim_y: float = rim[1]
+	var rim_color: Color = rim[2]
+
+	# Height and colour ease on different curves, and they have to.
+	#
+	# Landform wants to be smooth from the tile centre outward, or hills read as
+	# plateaus. Colour does not: blended over the same distance every biome
+	# bleeds into its neighbours until the map is watercolour and no tile is
+	# recognisably grassland or desert any more. So colour holds the tile's own
+	# value across most of the tile and then crosses quickly — soft seam, intact
+	# interior, which is what Civ 6's ground actually does.
+	var blend := smoothstep(CORE_RADIUS, 1.0, t)
+	var colour_blend := smoothstep(COLOR_HOLD, 1.0, t)
+	var y := lerpf(core_y, rim_y, blend)
+
+	# Crags are interior-only: a rim point is shared with the neighbour, and a
+	# per-tile offset applied there would pull the two apart into a crack.
+	if rocky:
+		var steep := pow(blend, PEAK_FALLOFF)
+		y = lerpf(core_y, rim_y, steep)
+		var angle := atan2(direction.z, direction.x)
+		var phase := _jag(tile.coord, 5) * PI
+		var ridge := cos(angle * RIDGE_COUNT + phase)
+		var fade := steep * (1.0 - steep) * 4.0
+		y -= (1.0 - ridge) * 0.5 * RIDGE_DEPTH * fade
+		y += _jag(tile.coord, spoke + 11) * CORE_JAG * (1.0 - steep)
+
+	var point := centre + direction * t
+	point.y = y
+	return [
+		point,
+		rock_color_at(y, base, _jag(tile.coord, spoke + 11)) if rocky
+		else core_color.lerp(rim_color, colour_blend),
+	]
 
 
 ## The ground material: vertex colour for the biome, world-space noise on top to

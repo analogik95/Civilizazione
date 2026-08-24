@@ -29,6 +29,7 @@ func _ready() -> void:
 
 	# Same grade the screenshot tool uses, so a screenshot is an honest preview.
 	_environment.environment = ArtPalette.build_environment()
+	ArtPalette.configure_sun($Sun)
 
 	_world.viewing_player_id = _human_id
 	_world.build(Game.map)

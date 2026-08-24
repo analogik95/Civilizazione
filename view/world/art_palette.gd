@@ -89,21 +89,26 @@ const HILL_TINTS := {
 ##   scale  target height in world units, before per-instance variation
 ##   jitter how far from tile centre they may stray, in tile radii
 const FEATURE_PROPS := {
+	# Counts are high on purpose. Civ 6's forest tiles carry a dozen or more
+	# well-grown trees packed nearly to the tile edge, and that density is a
+	# large part of why its ground looks like landscape rather than like a board
+	# with markers on it. Seven small trees in the middle of a bare hexagon
+	# reads as decoration; fourteen reaching the edges reads as a wood.
 	&"woods": {
 		"models": ["tree_oak", "tree_default", "tree_tall", "tree_oak_dark"],
-		"count": 7, "scale": 0.60, "jitter": 0.52,
+		"count": 15, "scale": 0.66, "jitter": 0.76,
 	},
 	&"rainforest": {
 		"models": ["tree_palm_tall", "tree_palm_short", "tree_palm_bend", "bush_large"],
-		"count": 6, "scale": 0.62, "jitter": 0.52,
+		"count": 14, "scale": 0.68, "jitter": 0.76,
 	},
 	&"marsh": {
 		"models": ["bush", "grass_tuft", "mushroom"],
-		"count": 5, "scale": 0.24, "jitter": 0.50,
+		"count": 11, "scale": 0.26, "jitter": 0.74,
 	},
 	&"floodplains": {
 		"models": ["grass_tuft", "bush"],
-		"count": 3, "scale": 0.20, "jitter": 0.48,
+		"count": 8, "scale": 0.22, "jitter": 0.72,
 	},
 	&"oasis": {
 		"models": ["tree_palm_short", "tree_palm_bend", "bush"],
@@ -290,6 +295,47 @@ static func surface_height(tile: Tile) -> float:
 	return HILL_SURFACE_Y if tile.is_hills else SURFACE_Y
 
 
+## Scatter for tiles carrying no feature at all.
+##
+## Bare terrain in Civ 6 is never bare: grassland has tufts and the odd shrub,
+## desert has stones and dead scrub, tundra has boulders. Without it every
+## unforested tile here was an empty painted plane, which is most of what made
+## the map look unfinished next to the real thing. Kept small and low-contrast
+## so it dresses the ground without competing with anything a player has built.
+const GROUND_COVER := {
+	&"grassland": {
+		"models": ["grass_tuft", "bush", "stone_flat"],
+		"count": 5, "scale": 0.17, "jitter": 0.74,
+	},
+	&"plains": {
+		"models": ["grass_tuft", "bush", "rock_small"],
+		"count": 4, "scale": 0.16, "jitter": 0.74,
+	},
+	&"desert": {
+		"models": ["rock_small", "stone_flat", "cactus_short"],
+		"count": 3, "scale": 0.17, "jitter": 0.72,
+	},
+	&"tundra": {
+		"models": ["rock_small", "stone_flat", "grass_tuft"],
+		"count": 3, "scale": 0.18, "jitter": 0.72,
+	},
+	&"snow": {
+		"models": ["stone_flat", "rock_small"],
+		"count": 2, "scale": 0.16, "jitter": 0.70,
+	},
+}
+
+
+## Dressing for a tile that has no feature of its own, or an empty dictionary
+## when the tile is water, mountain, or already carrying something.
+static func ground_cover(tile: Tile) -> Dictionary:
+	if tile.feature_id != &"" or not tile.is_land():
+		return {}
+	if tile.terrain_id == &"mountains":
+		return {}
+	return GROUND_COVER.get(tile.terrain_id, {})
+
+
 static func feature_props(tile: Tile) -> Dictionary:
 	var spec: Variant = FEATURE_PROPS.get(tile.feature_id)
 	if spec == null:
@@ -324,30 +370,79 @@ static func tile_position(tile: Tile) -> Vector3:
 	return pos
 
 
-## The world's lighting grade, shared by the interactive game and the screenshot
-## tool so what a screenshot shows is what the game looks like.
+## The look of the world: sky, ambient, tonemap.
 ##
-## The grade is deliberately restrained: a low-poly kit lit hard goes chalky,
-## because every surface is a flat colour with no texture detail to hold the
-## shading. Ambient stays low so faces actually differ in brightness, and the
-## saturation lift puts back what tonemapping takes out.
+## One source of truth, called by both the game scene and the screenshot runner.
+## They used to be configured separately, which meant every screenshot was lit
+## differently from the game it was supposed to be showing.
 static func build_environment() -> Environment:
 	var environment := Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color(0.38, 0.55, 0.72)
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color(0.50, 0.58, 0.72)
-	environment.ambient_light_energy = 0.34
 
+	# A sky rather than a flat colour. It is barely visible behind the map, but
+	# it is what the ambient term is sampled from, so ground facing up picks up
+	# skylight and ground facing sideways does not — most of the reason a hill
+	# reads as a hill before its shadow is drawn.
+	var sky_material := ProceduralSkyMaterial.new()
+	sky_material.sky_top_color = Color(0.30, 0.50, 0.76)
+	sky_material.sky_horizon_color = Color(0.70, 0.79, 0.87)
+	sky_material.ground_horizon_color = Color(0.70, 0.79, 0.87)
+	sky_material.ground_bottom_color = Color(0.42, 0.41, 0.37)
+	sky_material.sun_angle_max = 24.0
+	sky_material.sun_curve = 0.18
+
+	var sky := Sky.new()
+	sky.sky_material = sky_material
+
+	environment.background_mode = Environment.BG_SKY
+	environment.sky = sky
+	# An explicit colour, not the sky. Compatibility approximates sky ambient and
+	# in practice ignored the energy set here entirely — lowering it changed
+	# nothing measurable, which is how the shadows stayed washed out through
+	# several rounds of tuning. A flat ambient colour it does honour.
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	environment.ambient_light_color = Color(0.42, 0.47, 0.58)
+	# Measured rather than guessed. Sampling a land region of a Civ 6 screenshot
+	# gives a 5th-percentile luminance around 50 against a median of 140 — its
+	# shadows are dark but its shadowed ground is still recognisably ground. The
+	# same measurement here read 131 against 198 with ambient too high, and
+	# crushed to black when it went too low. This is the value that lands on it.
+	environment.ambient_light_energy = 0.17
+
+	# Slight aerial perspective, so distance reads. Heavier than this and the
+	# far side of a continent turns to milk.
 	environment.fog_enabled = true
-	environment.fog_light_color = Color(0.52, 0.64, 0.78)
-	environment.fog_density = 0.0018
+	environment.fog_light_color = Color(0.60, 0.70, 0.83)
+	environment.fog_density = 0.0006
 
 	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
-	environment.tonemap_exposure = 1.05
+	environment.tonemap_exposure = 0.70
 	environment.tonemap_white = 3.0
 
 	environment.adjustment_enabled = true
-	environment.adjustment_saturation = 1.16
-	environment.adjustment_contrast = 1.06
+	environment.adjustment_saturation = 1.18
+	environment.adjustment_contrast = 1.10
 	return environment
+
+
+## The sun. Also shared, for the same reason.
+##
+## High and warm, with a shadow map tight enough that a tree and a unit both
+## cast something you can see. Civ 6's ground reads as 3D mostly because of
+## these shadows: without them a rolling landscape is just a colour gradient.
+static func configure_sun(sun: DirectionalLight3D) -> void:
+	sun.rotation_degrees = Vector3(-52.0, -42.0, 0.0)
+	sun.light_color = Color(1.0, 0.96, 0.87)
+	sun.light_energy = 1.35
+	sun.shadow_enabled = true
+	# Small bias on purpose. The defaults push a shadow far enough off its caster
+	# that a tree's shadow lands outside the tree and disappears, which left the
+	# ground looking unlit even with shadows switched on.
+	sun.shadow_bias = 0.02
+	sun.shadow_normal_bias = 0.6
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.directional_shadow_split_1 = 0.05
+	sun.directional_shadow_split_2 = 0.16
+	sun.directional_shadow_split_3 = 0.42
+	# Short, so the near splits stay high-resolution over the ground the player
+	# is actually looking at rather than being spread over the whole continent.
+	sun.directional_shadow_max_distance = 62.0

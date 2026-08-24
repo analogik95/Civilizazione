@@ -32,5 +32,17 @@ window/stretch/mode="canvas_items"
 
 [rendering]
 
+; Compatibility, not Forward+.
+;
+; Godot defaults to Forward+, which needs Vulkan — and the headless box these
+; screenshots are rendered on has no Vulkan driver, so every screenshot was
+; taken under Compatibility while the shipped build ran Forward+. Lighting looks
+; different under the two, which meant the frames used to check the look were
+; not showing the game. A stylised low-poly 4X gains little from Forward+ and
+; runs far wider without it, so the renderer that can be verified is the one
+; that ships.
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+
 textures/canvas_textures/default_texture_filter=1
 anti_aliasing/quality/msaa_3d=2

@@ -167,6 +167,8 @@ func _bucket_props(tile: Tile, buckets: Dictionary) -> void:
 			ArtPalette.SHORE_ROCK_SCALE)
 
 	var spec := ArtPalette.feature_props(tile) if tile.is_land() else {}
+	if spec.is_empty():
+		spec = ArtPalette.ground_cover(tile)
 	if not spec.is_empty():
 		var models: Array = spec["models"]
 		for i in int(spec["count"]):
@@ -209,6 +211,16 @@ func _prop_transform(tile: Tile, offset: Vector3, yaw: float, surface: float) ->
 	return Transform3D(Basis(Vector3.UP, yaw), origin)
 
 
+## Warm the kit down toward the world's palette.
+##
+## The vendored foliage is a bright cyan-green — fine in the kit's own promo
+## renders, wrong against warm ground, and the single loudest colour in every
+## frame of this map. The multimesh already carries a colour per instance, so
+## pulling green and blue down there costs nothing and turns the teal into an
+## olive that belongs to the same world as the terrain under it.
+const PROP_TINT := Color(1.0, 0.86, 0.52)
+
+
 func _add_prop(
 	buckets: Dictionary, group: String, stem: String, tile: Tile,
 	transform: Transform3D, target_height: float
@@ -219,7 +231,7 @@ func _add_prop(
 	buckets.get_or_add(key, []).append({
 		"coord": tile.coord,
 		"transform": transform,
-		"color": Color.WHITE,
+		"color": PROP_TINT,
 		"height": target_height,
 	})
 
@@ -248,7 +260,10 @@ func _build_layer(key: String, group: String, entries: Array, registry: Dictiona
 		transform.basis = transform.basis.scaled(scale)
 		multimesh.set_instance_transform(i, transform)
 		multimesh.set_instance_color(i, entry["color"])
-		_tile_instances.get_or_add(entry["coord"], []).append([key, i])
+		# The base colour is recorded, not just applied. Fog repaints instance
+		# colours, and it used to repaint them to plain white — which silently
+		# threw away every prop tint the moment the map finished building.
+		_tile_instances.get_or_add(entry["coord"], []).append([key, i, entry["color"]])
 
 	var instance := MultiMeshInstance3D.new()
 	instance.name = key.replace("/", "_")
@@ -281,15 +296,12 @@ func _repaint_tile(tile: Tile) -> void:
 	var records: Array = _tile_instances.get(tile.coord, [])
 	if records.is_empty():
 		return
-	var shade := _fog_only(tile)
 	for record: Array in records:
 		var layer := _layer(record[0])
-		if layer != null:
-			layer.multimesh.set_instance_color(record[1], shade)
-
-
-func _fog_only(tile: Tile) -> Color:
-	return _apply_fog(tile, Color.WHITE)
+		if layer == null:
+			continue
+		var base: Color = record[2] if record.size() > 2 else Color.WHITE
+		layer.multimesh.set_instance_color(record[1], _apply_fog(tile, base))
 
 
 func _apply_fog(tile: Tile, base: Color) -> Color:
@@ -457,28 +469,46 @@ func _add_river_edge(surface: SurfaceTool, tile: Tile, direction: int) -> void:
 	# corner height rather than either tile's centre. Using a centre height
 	# leaves the ribbon buried wherever the terrain rises between tile middles —
 	# a mountain's crags do exactly that, and swallowed the rivers whole.
+	# Sit the water on the ground the edge actually has, which is the welded
+	# corner height rather than either tile's centre. Using a centre height
+	# leaves the ribbon buried wherever the terrain rises between tile middles —
+	# a mountain's crags do exactly that, and swallowed the rivers whole.
+	#
+	# The edge midpoint is sampled too, and has to be: the ground is no longer a
+	# straight chord between two corners. Since the terrain mesh started welding
+	# edge midpoints as shared points of their own, the surface bulges or dips
+	# halfway along every edge, and a two-corner ribbon spanned straight across
+	# it — which is why rivers were left standing over mountain passes as
+	# floating blue slabs.
 	var fallback := TerrainMesh.surface_height(tile)
-	var height_a := TerrainMesh.corner_height_at(a, fallback) - RIVER_DEPTH
-	var height_b := TerrainMesh.corner_height_at(b, fallback) - RIVER_DEPTH
-
-	var flat_a := Vector3(a.x, height_a, a.z)
-	var flat_b := Vector3(b.x, height_b, b.z)
+	var mid := (a + b) * 0.5
 	var along := (Vector3(b.x, 0.0, b.z) - Vector3(a.x, 0.0, a.z)).normalized()
 	var across := along.cross(Vector3.UP).normalized() * RIVER_HALF_WIDTH
 
-	var p0 := TerrainMesh.perturb(flat_a - across)
-	var p1 := TerrainMesh.perturb(flat_a + across)
-	var p2 := TerrainMesh.perturb(flat_b + across)
-	var p3 := TerrainMesh.perturb(flat_b - across)
+	# Five samples, not two. On a steep flank a straight ribbon spans across
+	# concave ground and pokes out of the hillside as a floating slab.
+	var points: Array[Vector3] = [
+		a, a.lerp(mid, 0.5), mid, mid.lerp(b, 0.5), b,
+	]
+	var left: Array[Vector3] = []
+	var right: Array[Vector3] = []
+	for point: Vector3 in points:
+		var y := TerrainMesh.corner_height_at(point, fallback) - RIVER_DEPTH
+		left.append(TerrainMesh.perturb(Vector3(point.x, y, point.z) - across))
+		right.append(TerrainMesh.perturb(Vector3(point.x, y, point.z) + across))
 
 	# UV: X runs bank to bank and drives the pale edge shading, Y runs along the
 	# ribbon and is what the shader scrolls to make the water flow.
-	_river_vertex(surface, p0, Vector2(0.0, 0.0))
-	_river_vertex(surface, p1, Vector2(1.0, 0.0))
-	_river_vertex(surface, p2, Vector2(1.0, 1.0))
-	_river_vertex(surface, p0, Vector2(0.0, 0.0))
-	_river_vertex(surface, p2, Vector2(1.0, 1.0))
-	_river_vertex(surface, p3, Vector2(0.0, 1.0))
+	var step := 1.0 / float(points.size() - 1)
+	for i in points.size() - 1:
+		var v0 := float(i) * step
+		var v1 := float(i + 1) * step
+		_river_vertex(surface, left[i], Vector2(0.0, v0))
+		_river_vertex(surface, right[i], Vector2(1.0, v0))
+		_river_vertex(surface, right[i + 1], Vector2(1.0, v1))
+		_river_vertex(surface, left[i], Vector2(0.0, v0))
+		_river_vertex(surface, right[i + 1], Vector2(1.0, v1))
+		_river_vertex(surface, left[i + 1], Vector2(0.0, v1))
 
 
 func _river_vertex(surface: SurfaceTool, position: Vector3, uv: Vector2) -> void:

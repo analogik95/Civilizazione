@@ -20,14 +20,14 @@ uniform sampler2D noise_texture : hint_default_white, repeat_enable, filter_line
 // patches larger than a tile, so terrain does not look uniform across a
 // continent. The fine one gives close-up texture.
 uniform float coarse_scale = 0.035;
-uniform float coarse_strength = 0.15;
+uniform float coarse_strength = 0.085;
 // A middle octave at roughly tile scale. Without it the ground had regional
 // drift and fine grain but nothing in between, so the eye read the space
 // between the two as flat.
 uniform float medium_scale = 0.13;
-uniform float medium_strength = 0.11;
+uniform float medium_strength = 0.070;
 uniform float fine_scale = 0.34;
-uniform float fine_strength = 0.08;
+uniform float fine_strength = 0.045;
 
 // Ground colour drifts in hue as well as brightness. Real terrain is not one
 // green at several exposures; it goes yellow where it is dry and blue-green
@@ -36,9 +36,11 @@ uniform float fine_strength = 0.08;
 uniform vec3 warm_tint = vec3(0.06, 0.03, -0.04);
 uniform float tint_strength = 0.32;
 
-// Slopes darken, which is what makes relief legible on ground that is otherwise
-// one flat colour — and on mountains it is what turns a grey lump into faces.
-uniform float slope_shading = 0.34;
+// Slopes darken very slightly. This used to carry most of the relief, back when
+// the scene had no Environment resource and therefore almost no real lighting —
+// with a sky, ambient and a shadowed sun doing that job properly, the same
+// value darkens every mountain face twice and turns ranges into black cutouts.
+uniform float slope_shading = 0.10;
 
 uniform float roughness_value = 0.95;
 

@@ -229,10 +229,7 @@ func _add_camera(target: Vector3, distance: float, pitch_degrees: float) -> Came
 func _add_lighting() -> void:
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
-	sun.rotation_degrees = Vector3(-50.0, -40.0, 0.0)
-	sun.light_energy = 1.0
-	sun.light_color = Color(1.0, 0.96, 0.88)
-	sun.shadow_enabled = true
+	ArtPalette.configure_sun(sun)
 	add_child(sun)
 
 	var world_environment := WorldEnvironment.new()

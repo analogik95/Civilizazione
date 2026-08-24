@@ -1,5 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <path d="M32 8 C32 8 50 28 50 40 a18 18 0 0 1 -36 0 C14 28 32 8 32 8 Z"
-        fill="#f2f5ff" stroke="#5c6785" stroke-width="3.5" stroke-linejoin="round"/>
-  <path d="M32 24 C32 24 41 34 41 41 a9 9 0 0 1 -18 0 C23 34 32 24 32 24 Z" fill="#c9d6f5"/>
+  <rect id="yield-plate" x="1.5" y="1.5" width="61" height="61" rx="17" fill="#12161fdd" stroke="#e7d9b4" stroke-width="2.5" stroke-opacity="0.55"/>
+  <g transform="translate(32 32) scale(0.74) translate(-32 -32)">
+    <path d="M32 8 C32 8 50 28 50 40 a18 18 0 0 1 -36 0 C14 28 32 8 32 8 Z"
+            fill="#f2f5ff" stroke="#5c6785" stroke-width="3.5" stroke-linejoin="round"/>
+      <path d="M32 24 C32 24 41 34 41 41 a9 9 0 0 1 -18 0 C23 34 32 24 32 24 Z" fill="#c9d6f5"/>
+  </g>
 </svg>
