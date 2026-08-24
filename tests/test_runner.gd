@@ -478,6 +478,19 @@ func _test_rivers() -> void:
 				drowned += 1
 	check(drowned == 0, "no river edge has water on both sides (found %d)" % drowned)
 
+	# Nor through solid rock.
+	var through_rock := 0
+	for tile: Tile in map.all_tiles():
+		if tile.terrain_id != &"mountains":
+			continue
+		for direction in Hex.DIRECTION_COUNT:
+			if not tile.has_river_on(direction):
+				continue
+			var neighbour := map.neighbor_in(tile.coord, direction)
+			if neighbour != null and neighbour.terrain_id == &"mountains":
+				through_rock += 1
+	check(through_rock == 0, "no river edge runs between two mountains (found %d)" % through_rock)
+
 
 func _touches_water(map: MapModel, tile: Tile) -> bool:
 	if tile.is_water():

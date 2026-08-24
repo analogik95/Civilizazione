@@ -626,21 +626,30 @@ func _is_hollow(tile: Tile) -> bool:
 	return higher >= 4
 
 
-## Drop river edges that ended up between two water tiles.
+## Drop river edges that cannot be rivers.
 ##
 ## Forming a lake drowns the ground a chain was running over, and an edge with
-## water on both sides is not a river any more — it is just lake. Left in place
-## these show up as blue slivers stranded in open water, and as isolated edges
-## in the river-continuity test.
+## water on both sides is not a river any more — it is just lake. An edge with
+## mountains on both sides is not one either. Left in place the first shows up
+## as blue slivers stranded in open water and the second as sheets standing on
+## cliff faces, and both count as isolated edges in the continuity test.
 func _prune_drowned_rivers() -> void:
 	for tile: Tile in map.all_tiles():
-		if tile.river_edges == 0 or not tile.is_water():
+		if tile.river_edges == 0:
 			continue
 		for direction in Hex.DIRECTION_COUNT:
 			if not tile.has_river_on(direction):
 				continue
 			var neighbour := map.neighbor_in(tile.coord, direction)
-			if neighbour != null and neighbour.is_water():
+			if neighbour == null:
+				continue
+			if tile.is_water() and neighbour.is_water():
+				map.set_river(tile.coord, direction, false)
+			# A river between two mountains is a river through solid rock. The
+			# tracer follows the elevation field downhill and will happily route
+			# one over a saddle in a range; on the ground that renders as a blue
+			# sheet standing vertically down a cliff face.
+			elif tile.terrain_id == &"mountains" and neighbour.terrain_id == &"mountains":
 				map.set_river(tile.coord, direction, false)
 
 	_prune_stranded_rivers()

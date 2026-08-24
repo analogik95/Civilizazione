@@ -16,11 +16,19 @@ extends Node3D
 ## Icons sit on the perturbed ground like every other overlay; placing them at
 ## the ideal hex centre leaves them hovering beside the tile they describe.
 
-const ICON_SIZE := 0.46
-const ICON_SPACING := 0.40
-const ROW_SPACING := 0.38
-const PER_ROW := 3
-const LIFT := 0.62
+## Small, and clustered tight.
+##
+## The first plated version drew each pip at 0.46 with the cluster spread over
+## most of the tile, and the map vanished under a carpet of badges — Civ 6's sit
+## at roughly a quarter of a tile and take up a corner of it, so the ground
+## stays visible underneath. A lens you have to turn off to see the map is not
+## doing its job.
+const ICON_SIZE := 0.30
+## Gap between the columns, one per yield kind.
+const COLUMN_SPACING := 0.30
+## Gap between pips stacked within a column.
+const STACK_SPACING := 0.27
+const LIFT := 0.58
 ## Beyond this a tile is a wall of dots rather than information.
 const MAX_PIPS_PER_KIND := 5
 
@@ -128,28 +136,29 @@ func rebuild() -> void:
 		if viewing_player_id >= 0 and not Game.map.is_explored(viewing_player_id, tile.coord):
 			continue
 
+		# One column per yield kind, pips stacked within it — the way Civ 6 groups
+		# three food into one badge of three wheat rather than three loose marks.
+		# Flattening every pip into rows of three mixed the kinds together and
+		# made a tile's yields something you had to count rather than read.
 		var yields := tile.base_yields()
-		var pips: Array = []
+		var columns: Array = []
 		for kind: Yields.Kind in KIND_ORDER:
-			var amount := int(round(yields.get_kind(kind)))
-			for _i in mini(amount, MAX_PIPS_PER_KIND):
-				pips.append(kind)
-		if pips.is_empty():
+			var amount := mini(int(round(yields.get_kind(kind))), MAX_PIPS_PER_KIND)
+			if amount > 0:
+				columns.append([kind, amount])
+		if columns.is_empty():
 			continue
 
 		var base := TerrainMesh.perturb(Hex.to_world(tile.coord, ArtPalette.HEX_SIZE))
 		base.y = TerrainMesh.surface_height(tile) + LIFT
 
-		var rows := int(ceil(float(pips.size()) / float(PER_ROW)))
-		for index in pips.size():
-			var row := index / PER_ROW
-			var column := index % PER_ROW
-			# Centre each row on the tile so the cluster stays balanced whether
-			# it holds two pips or twelve.
-			var in_row := mini(PER_ROW, pips.size() - row * PER_ROW)
-			var x := (float(column) - (in_row - 1) * 0.5) * ICON_SPACING
-			var z := (float(row) - (rows - 1) * 0.5) * ROW_SPACING
-			batches.get_or_add(pips[index], []).append(base + Vector3(x, 0.0, z))
+		for index in columns.size():
+			var kind: Yields.Kind = columns[index][0]
+			var amount: int = columns[index][1]
+			var x := (float(index) - (columns.size() - 1) * 0.5) * COLUMN_SPACING
+			for pip in amount:
+				var z := (float(pip) - (amount - 1) * 0.5) * STACK_SPACING
+				batches.get_or_add(kind, []).append(base + Vector3(x, 0.0, z))
 
 	for kind: Yields.Kind in batches:
 		_build_batch(kind, batches[kind])

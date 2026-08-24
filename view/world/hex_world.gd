@@ -490,10 +490,18 @@ func _add_river_edge(surface: SurfaceTool, tile: Tile, direction: int) -> void:
 	var points: Array[Vector3] = [
 		a, a.lerp(mid, 0.5), mid, mid.lerp(b, 0.5), b,
 	]
+
+	# Water runs in the valley, never up the hillside. Corner heights on a
+	# mountain edge span the whole flank, so an unclamped ribbon climbs it.
+	var other := map.neighbor_in(tile.coord, direction)
+	var ceiling := fallback
+	if other != null:
+		ceiling = minf(ceiling, TerrainMesh.surface_height(other))
+
 	var left: Array[Vector3] = []
 	var right: Array[Vector3] = []
 	for point: Vector3 in points:
-		var y := TerrainMesh.corner_height_at(point, fallback) - RIVER_DEPTH
+		var y := minf(TerrainMesh.corner_height_at(point, fallback), ceiling) - RIVER_DEPTH
 		left.append(TerrainMesh.perturb(Vector3(point.x, y, point.z) - across))
 		right.append(TerrainMesh.perturb(Vector3(point.x, y, point.z) + across))
 
