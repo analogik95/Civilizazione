@@ -1,0 +1,94 @@
+[
+  { "id": "battlecry", "name": "Battlecry", "class": "melee", "tier": 1,
+    "description": "+7 Combat Strength against melee and anti-cavalry units.",
+    "modifiers": [{ "id": "p_battlecry", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 7 },
+      "requirements": [{ "type": "OPPONENT_CLASS_IS", "args": { "unit_class": ["melee", "anti_cavalry"] } }] }] },
+
+  { "id": "tortoise", "name": "Tortoise", "class": "melee", "tier": 1,
+    "description": "+10 Combat Strength when defending against ranged attacks.",
+    "modifiers": [{ "id": "p_tortoise", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 10 },
+      "requirements": [
+        { "type": "UNIT_IS_ATTACKING", "args": {}, "inverse": true },
+        { "type": "OPPONENT_CLASS_IS", "args": { "unit_class": ["ranged", "siege"] } }
+      ] }] },
+
+  { "id": "commando", "name": "Commando", "class": "melee", "tier": 2, "requires": "battlecry",
+    "description": "+1 Movement.",
+    "modifiers": [{ "id": "p_commando", "effect": "ADJUST_UNIT_MOVEMENT", "scope": "unit", "args": { "amount": 1 } }] },
+
+  { "id": "amphibious", "name": "Amphibious", "class": "melee", "tier": 2, "requires": "tortoise",
+    "description": "No penalty attacking across a river or from the sea.",
+    "modifiers": [] },
+
+  { "id": "volley", "name": "Volley", "class": "ranged", "tier": 1,
+    "description": "+5 Ranged Strength against land units.",
+    "modifiers": [{ "id": "p_volley", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 5 },
+      "requirements": [{ "type": "UNIT_IS_ATTACKING", "args": {} }] }] },
+
+  { "id": "garrison", "name": "Garrison", "class": "ranged", "tier": 1,
+    "description": "+10 Combat Strength when defending in a district.",
+    "modifiers": [{ "id": "p_garrison", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 10 },
+      "requirements": [{ "type": "UNIT_IS_ATTACKING", "args": {}, "inverse": true }] }] },
+
+  { "id": "arrow_storm", "name": "Arrow Storm", "class": "ranged", "tier": 2, "requires": "volley",
+    "description": "+7 Ranged Strength against districts and cities.",
+    "modifiers": [{ "id": "p_arrow_storm", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 7 },
+      "requirements": [{ "type": "OPPONENT_IS_CITY", "args": {} }] }] },
+
+  { "id": "echelon", "name": "Echelon", "class": "anti_cavalry", "tier": 1,
+    "description": "+10 Combat Strength against cavalry.",
+    "modifiers": [{ "id": "p_echelon", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 10 },
+      "requirements": [{ "type": "OPPONENT_CLASS_IS", "args": { "unit_class": ["light_cavalry", "heavy_cavalry"] } }] }] },
+
+  { "id": "square", "name": "Square", "class": "anti_cavalry", "tier": 2, "requires": "echelon",
+    "description": "+10 Combat Strength when defending.",
+    "modifiers": [{ "id": "p_square", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 10 },
+      "requirements": [{ "type": "UNIT_IS_ATTACKING", "args": {}, "inverse": true }] }] },
+
+  { "id": "caparison", "name": "Caparison", "class": "heavy_cavalry", "tier": 1,
+    "description": "+10 Combat Strength against anti-cavalry units.",
+    "modifiers": [{ "id": "p_caparison", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 10 },
+      "requirements": [{ "type": "OPPONENT_CLASS_IS", "args": { "unit_class": ["anti_cavalry"] } }] }] },
+
+  { "id": "charge", "name": "Charge", "class": "heavy_cavalry", "tier": 2, "requires": "caparison",
+    "description": "+10 Combat Strength against wounded units.",
+    "modifiers": [{ "id": "p_charge", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 10 },
+      "requirements": [{ "type": "UNIT_IS_ATTACKING", "args": {} }] }] },
+
+  { "id": "coursers", "name": "Coursers", "class": "light_cavalry", "tier": 1,
+    "description": "+10 Combat Strength against ranged and siege units.",
+    "modifiers": [{ "id": "p_coursers", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 10 },
+      "requirements": [{ "type": "OPPONENT_CLASS_IS", "args": { "unit_class": ["ranged", "siege"] } }] }] },
+
+  { "id": "depredation", "name": "Depredation", "class": "light_cavalry", "tier": 2, "requires": "coursers",
+    "description": "+1 Movement.",
+    "modifiers": [{ "id": "p_depredation", "effect": "ADJUST_UNIT_MOVEMENT", "scope": "unit", "args": { "amount": 1 } }] },
+
+  { "id": "grape_shot", "name": "Grape Shot", "class": "siege", "tier": 1,
+    "description": "+7 Combat Strength against land units.",
+    "modifiers": [{ "id": "p_grape_shot", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 7 },
+      "requirements": [{ "type": "OPPONENT_IS_CITY", "args": {}, "inverse": true }] }] },
+
+  { "id": "crew_weapons", "name": "Crew Weapons", "class": "siege", "tier": 2, "requires": "grape_shot",
+    "description": "+10 Ranged Strength against districts.",
+    "modifiers": [{ "id": "p_crew_weapons", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 10 },
+      "requirements": [{ "type": "OPPONENT_IS_CITY", "args": {} }] }] },
+
+  { "id": "ranger", "name": "Ranger", "class": "recon", "tier": 1,
+    "description": "+5 Combat Strength in woods and rainforest.",
+    "modifiers": [{ "id": "p_ranger", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 5 },
+      "requirements": [{ "type": "TILE_FEATURE_IS", "args": { "feature": ["woods", "rainforest"] } }] }] },
+
+  { "id": "alpine", "name": "Alpine", "class": "recon", "tier": 2, "requires": "ranger",
+    "description": "+1 Movement.",
+    "modifiers": [{ "id": "p_alpine", "effect": "ADJUST_UNIT_MOVEMENT", "scope": "unit", "args": { "amount": 1 } }] },
+
+  { "id": "helmsman", "name": "Helmsman", "class": "naval_melee", "tier": 1,
+    "description": "+1 Movement.",
+    "modifiers": [{ "id": "p_helmsman", "effect": "ADJUST_UNIT_MOVEMENT", "scope": "unit", "args": { "amount": 1 } }] },
+
+  { "id": "embolon", "name": "Embolon", "class": "naval_melee", "tier": 2, "requires": "helmsman",
+    "description": "+7 Combat Strength against naval units.",
+    "modifiers": [{ "id": "p_embolon", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 7 },
+      "requirements": [{ "type": "OPPONENT_CLASS_IS", "args": { "unit_class": ["naval_melee", "naval_ranged", "naval_raider"] } }] }] }
+]

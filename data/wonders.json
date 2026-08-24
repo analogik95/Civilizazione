@@ -1,0 +1,53 @@
+[
+  { "id": "great_library", "name": "The Great Library", "era": 1, "cost": 400,
+    "required_tech": "writing", "requires_adjacent_district": "campus",
+    "description": "Every scroll worth copying, in one building.",
+    "yields": { "science": 3, "culture": 1 } },
+
+  { "id": "pyramids", "name": "The Pyramids", "era": 0, "cost": 220,
+    "required_tech": "masonry", "valid_terrain": ["desert"],
+    "description": "A tomb that outlasts the empire that built it. Builders gain an extra charge.",
+    "yields": { "culture": 2 },
+    "modifiers": [{ "id": "w_pyramids", "effect": "ADJUST_BUILDER_CHARGES", "scope": "player", "args": { "amount": 1 },
+      "description": "+1 Builder charge." }] },
+
+  { "id": "hanging_gardens", "name": "The Hanging Gardens", "era": 0, "cost": 180,
+    "required_tech": "irrigation", "requires_river": true,
+    "description": "Terraced water in a dry country. Every city grows faster.",
+    "yields": { "food": 2 },
+    "modifiers": [{ "id": "w_hanging_gardens", "effect": "ADJUST_CITY_HOUSING", "scope": "city", "args": { "amount": 1 },
+      "description": "+1 Housing in all cities." }] },
+
+  { "id": "colossus", "name": "The Colossus", "era": 0, "cost": 200,
+    "required_tech": "sailing", "requires_adjacent_district": "harbor", "requires_coast": true,
+    "description": "A statue visible from far out to sea, and an advertisement for the harbour beneath it.",
+    "yields": { "gold": 3 },
+    "modifiers": [{ "id": "w_colossus", "effect": "ADJUST_TRADE_CAPACITY", "scope": "player", "args": { "amount": 1 },
+      "description": "+1 Trade Route capacity." }] },
+
+  { "id": "oracle", "name": "The Oracle", "era": 1, "cost": 290,
+    "required_civic": "mysticism", "requires_adjacent_district": "holy_site",
+    "description": "Prophecy as statecraft. Great People come cheaper to the city that holds it.",
+    "yields": { "culture": 1, "faith": 1 },
+    "modifiers": [{ "id": "w_oracle", "effect": "ADJUST_GREAT_PERSON_POINTS_PERCENT", "scope": "player", "args": { "amount": 25 },
+      "description": "+25% Great Person points." }] },
+
+  { "id": "great_bath", "name": "The Great Bath", "era": 0, "cost": 180,
+    "required_tech": "pottery", "requires_river": true,
+    "description": "Ritual bathing on a civic scale. The city that owns it shrugs off floods.",
+    "yields": { "faith": 3 },
+    "modifiers": [{ "id": "w_great_bath", "effect": "ADJUST_CITY_AMENITIES", "scope": "city", "args": { "amount": 1 },
+      "description": "+1 Amenity in this city.", "requirements": [{ "type": "CITY_IS_CAPITAL", "args": {} }] }] },
+
+  { "id": "petra", "name": "Petra", "era": 1, "cost": 400,
+    "required_tech": "mathematics", "valid_terrain": ["desert"],
+    "description": "A city cut into the rock of a place nobody should be able to live.",
+    "yields": { "gold": 2, "culture": 1, "food": 2 } },
+
+  { "id": "colosseum", "name": "The Colosseum", "era": 1, "cost": 400,
+    "required_tech": "construction", "requires_adjacent_district": "entertainment_complex",
+    "description": "Bread and circuses, industrialised.",
+    "yields": { "culture": 2 },
+    "modifiers": [{ "id": "w_colosseum", "effect": "ADJUST_CITY_AMENITIES", "scope": "city", "args": { "amount": 2 },
+      "description": "+2 Amenities in all cities." }] }
+]

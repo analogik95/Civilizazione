@@ -65,3 +65,21 @@ Thumbs.db
 screenshots/
 saves/
 logs/
+
+# Godot
+.godot/
+.import/
+export.cfg
+*.translation
+build_out/
+*.tmp
+
+# Blender
+*.blend1
+*.blend2
+# Toolchain and asset caches — fetched by tools/, never committed.
+.toolchain/
+.assetcache/
+
+# Exported binaries — built by tools/, not committed (100MB+ each).
+build/

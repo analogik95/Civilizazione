@@ -1,0 +1,88 @@
+[
+  {
+    "id": "woods",
+    "name": "Woods",
+    "description": "Temperate forest. Adds production, slows movement, and can be chopped for a one-off yield.",
+    "yields": { "production": 1 },
+    "valid_terrain": ["grassland", "plains", "tundra"],
+    "movement_cost": 2,
+    "defense_modifier": 3,
+    "appeal": 1,
+    "removable": true
+  },
+  {
+    "id": "rainforest",
+    "name": "Rainforest",
+    "description": "Dense tropical growth. Feeds a city but chokes its Appeal.",
+    "yields": { "food": 1 },
+    "valid_terrain": ["plains", "grassland"],
+    "movement_cost": 2,
+    "defense_modifier": 3,
+    "appeal": -1,
+    "removable": true
+  },
+  {
+    "id": "marsh",
+    "name": "Marsh",
+    "description": "Waterlogged ground. Extra food, poor Appeal, and blocks most improvements until drained.",
+    "yields": { "food": 1 },
+    "valid_terrain": ["grassland"],
+    "movement_cost": 2,
+    "appeal": -1,
+    "removable": true,
+    "blocks_improvement": true
+  },
+  {
+    "id": "floodplains",
+    "name": "Floodplains",
+    "description": "Silt deposited by a river. Exceptional food at the price of periodic flooding.",
+    "yields": { "food": 3 },
+    "valid_terrain": ["desert", "grassland", "plains"],
+    "movement_cost": 1,
+    "appeal": -1,
+    "requires_river": true,
+    "removable": false
+  },
+  {
+    "id": "oasis",
+    "name": "Oasis",
+    "description": "Fresh water in the deep desert. Cannot be removed, and supplies Housing like a river.",
+    "yields": { "food": 3, "gold": 1 },
+    "valid_terrain": ["desert"],
+    "movement_cost": 1,
+    "appeal": 1,
+    "removable": false
+  },
+  {
+    "id": "reef",
+    "name": "Reef",
+    "description": "Coral shelf. Rich fishing and a major Campus adjacency source.",
+    "yields": { "food": 1, "production": 1 },
+    "valid_terrain": ["coast"],
+    "movement_cost": 2,
+    "appeal": 1,
+    "requires_coast": true,
+    "removable": false
+  },
+  {
+    "id": "ice",
+    "name": "Ice",
+    "description": "Pack ice. Impassable to anything without an icebreaker.",
+    "yields": {},
+    "valid_terrain": ["coast", "ocean"],
+    "movement_cost": 999,
+    "is_impassable": true,
+    "appeal": -1,
+    "removable": false
+  },
+  {
+    "id": "geothermal_fissure",
+    "name": "Geothermal Fissure",
+    "description": "A vent of volcanic heat. Major adjacency for a Campus, and later a power source.",
+    "yields": { "science": 1 },
+    "valid_terrain": ["tundra", "plains", "desert", "grassland", "snow"],
+    "movement_cost": 1,
+    "appeal": 1,
+    "removable": false
+  }
+]

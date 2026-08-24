@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect id="yield-plate" x="1.5" y="1.5" width="61" height="61" rx="17" fill="#12161fdd" stroke="#e7d9b4" stroke-width="2.5" stroke-opacity="0.55"/>
+  <g transform="translate(32 32) scale(0.74) translate(-32 -32)">
+    <g stroke="#1d3a17" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+        <path d="M32 56 V22" />
+        <path d="M32 34 C22 32 17 25 18 16 C27 16 33 22 32 34 Z" fill="#7ed957"/>
+        <path d="M32 34 C42 32 47 25 46 16 C37 16 31 22 32 34 Z" fill="#5fbb3f"/>
+        <path d="M32 46 C24 44 20 38 21 31 C29 31 33 36 32 46 Z" fill="#7ed957"/>
+        <path d="M32 46 C40 44 44 38 43 31 C35 31 31 36 32 46 Z" fill="#5fbb3f"/>
+      </g>
+  </g>
+</svg>

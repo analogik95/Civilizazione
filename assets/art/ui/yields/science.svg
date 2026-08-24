@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect id="yield-plate" x="1.5" y="1.5" width="61" height="61" rx="17" fill="#12161fdd" stroke="#e7d9b4" stroke-width="2.5" stroke-opacity="0.55"/>
+  <g transform="translate(32 32) scale(0.74) translate(-32 -32)">
+    <g stroke="#0d2b4a" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M26 10 h12 v16 l12 22 a6 6 0 0 1 -5 9 H19 a6 6 0 0 1 -5 -9 l12 -22 Z" fill="#8fd0ff"/>
+        <path d="M20 40 h24 l6 8 a6 6 0 0 1 -5 9 H19 a6 6 0 0 1 -5 -9 Z" fill="#3f9de0"/>
+        <path d="M24 10 h16" />
+      </g>
+  </g>
+</svg>

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "farm",
+    "name": "Farm",
+    "description": "Tilled fields. The backbone of city growth.",
+    "yields": { "food": 1 },
+    "required_tech": "",
+    "valid_terrain": ["grassland", "plains", "desert"],
+    "valid_features": ["floodplains", ""],
+    "appeal": 0
+  },
+  {
+    "id": "mine",
+    "name": "Mine",
+    "description": "Cuts production out of hills and ore. Ugly to live beside.",
+    "yields": { "production": 1 },
+    "required_tech": "mining",
+    "valid_terrain": ["grassland", "plains", "desert", "tundra", "snow"],
+    "appeal": -1
+  },
+  {
+    "id": "quarry",
+    "name": "Quarry",
+    "description": "Extracts stone and marble.",
+    "yields": { "production": 1 },
+    "required_tech": "mining",
+    "valid_resources": ["stone", "marble"],
+    "requires_resource": true,
+    "appeal": -1
+  },
+  {
+    "id": "pasture",
+    "name": "Pasture",
+    "description": "Grazing land for herds and horses.",
+    "yields": { "production": 1 },
+    "required_tech": "animal_husbandry",
+    "valid_resources": ["cattle", "sheep", "horses"],
+    "requires_resource": true
+  },
+  {
+    "id": "camp",
+    "name": "Camp",
+    "description": "A hunting and trapping station.",
+    "yields": { "gold": 1 },
+    "required_tech": "animal_husbandry",
+    "valid_resources": ["deer", "furs", "ivory"],
+    "requires_resource": true,
+    "removes_feature": false,
+    "valid_features": ["woods", "rainforest", ""]
+  },
+  {
+    "id": "plantation",
+    "name": "Plantation",
+    "description": "Cultivates luxury crops for export.",
+    "yields": { "gold": 2 },
+    "required_tech": "irrigation",
+    "valid_resources": ["wine", "incense", "silk", "dyes", "cotton", "sugar", "citrus", "cocoa"],
+    "requires_resource": true,
+    "removes_feature": false,
+    "valid_features": ["rainforest", "woods", "marsh", "floodplains", ""]
+  },
+  {
+    "id": "fishing_boats",
+    "name": "Fishing Boats",
+    "description": "Works a marine resource from the water.",
+    "yields": { "food": 1 },
+    "required_tech": "sailing",
+    "valid_terrain": ["coast"],
+    "valid_resources": ["fish", "crabs", "pearls"],
+    "requires_resource": true
+  }
+]

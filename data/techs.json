@@ -1,0 +1,101 @@
+[
+  { "id": "pottery", "name": "Pottery", "era": 0, "cost": 25, "prerequisites": [],
+    "boost_text": "Build a Granary.", "boost": { "type": "BUILD_BUILDING", "args": { "building": "granary" } },
+    "unlocks": ["granary"] },
+
+  { "id": "animal_husbandry", "name": "Animal Husbandry", "era": 0, "cost": 25, "prerequisites": [],
+    "boost_text": "Build a Pasture.", "boost": { "type": "BUILD_IMPROVEMENT", "args": { "improvement": "pasture" } },
+    "unlocks": ["pasture", "camp"] },
+
+  { "id": "mining", "name": "Mining", "era": 0, "cost": 25, "prerequisites": [],
+    "boost_text": "Build a Mine.", "boost": { "type": "BUILD_IMPROVEMENT", "args": { "improvement": "mine" } },
+    "unlocks": ["mine", "quarry"] },
+
+  { "id": "sailing", "name": "Sailing", "era": 0, "cost": 50, "prerequisites": ["pottery"],
+    "boost_text": "Found a city on the coast.", "boost": { "type": "FOUND_COASTAL_CITY", "args": {} },
+    "unlocks": ["harbor", "fishing_boats", "galley"] },
+
+  { "id": "astrology", "name": "Astrology", "era": 0, "cost": 50, "prerequisites": ["pottery"],
+    "boost_text": "Find a Natural Wonder.", "boost": { "type": "DISCOVER_NATURAL_WONDER", "args": {} },
+    "unlocks": ["holy_site", "shrine"] },
+
+  { "id": "irrigation", "name": "Irrigation", "era": 0, "cost": 50, "prerequisites": ["pottery"],
+    "boost_text": "Farm a resource.", "boost": { "type": "IMPROVE_RESOURCE", "args": { "improvement": "farm" } },
+    "unlocks": ["plantation"] },
+
+  { "id": "writing", "name": "Writing", "era": 0, "cost": 50, "prerequisites": ["pottery"],
+    "boost_text": "Meet another civilization.", "boost": { "type": "MEET_CIVILIZATIONS", "args": { "count": 1 } },
+    "unlocks": ["campus", "library"] },
+
+  { "id": "archery", "name": "Archery", "era": 0, "cost": 50, "prerequisites": ["animal_husbandry"],
+    "boost_text": "Kill a unit with a Slinger.", "boost": { "type": "KILL_WITH_UNIT", "args": { "unit": "slinger", "count": 1 } },
+    "unlocks": ["archer"] },
+
+  { "id": "masonry", "name": "Masonry", "era": 0, "cost": 80, "prerequisites": ["mining"],
+    "boost_text": "Build a Quarry.", "boost": { "type": "BUILD_IMPROVEMENT", "args": { "improvement": "quarry" } },
+    "unlocks": ["ancient_walls"] },
+
+  { "id": "bronze_working", "name": "Bronze Working", "era": 0, "cost": 80, "prerequisites": ["mining"],
+    "boost_text": "Kill 3 barbarians.", "boost": { "type": "KILL_UNITS", "args": { "count": 3, "owner": "barbarian" } },
+    "unlocks": ["encampment", "barracks", "spearman"] },
+
+  { "id": "wheel", "name": "The Wheel", "era": 0, "cost": 80, "prerequisites": ["mining"],
+    "boost_text": "Mine a resource.", "boost": { "type": "IMPROVE_RESOURCE", "args": { "improvement": "mine" } },
+    "unlocks": ["water_mill", "heavy_chariot"] },
+
+  { "id": "celestial_navigation", "name": "Celestial Navigation", "era": 1, "cost": 120, "prerequisites": ["sailing", "astrology"],
+    "boost_text": "Improve 2 sea resources.", "boost": { "type": "IMPROVE_RESOURCE", "args": { "improvement": "fishing_boats", "count": 2 } },
+    "unlocks": ["lighthouse"] },
+
+  { "id": "horseback_riding", "name": "Horseback Riding", "era": 1, "cost": 120, "prerequisites": ["animal_husbandry"],
+    "boost_text": "Build a pasture on Horses.", "boost": { "type": "IMPROVE_RESOURCE", "args": { "resource": "horses" } },
+    "unlocks": ["horseman"] },
+
+  { "id": "currency", "name": "Currency", "era": 1, "cost": 120, "prerequisites": ["writing"],
+    "boost_text": "Build 2 farms.", "boost": { "type": "BUILD_IMPROVEMENT", "args": { "improvement": "farm", "count": 2 } },
+    "unlocks": ["commercial_hub", "market"] },
+
+  { "id": "iron_working", "name": "Iron Working", "era": 1, "cost": 170, "prerequisites": ["bronze_working"],
+    "boost_text": "Build an Iron mine.", "boost": { "type": "IMPROVE_RESOURCE", "args": { "resource": "iron" } },
+    "unlocks": ["swordsman"] },
+
+  { "id": "mathematics", "name": "Mathematics", "era": 1, "cost": 170, "prerequisites": ["currency", "wheel"],
+    "boost_text": "Build 2 specialty districts.", "boost": { "type": "BUILD_DISTRICT", "args": { "count": 2 } },
+    "unlocks": ["catapult", "shipyard"] },
+
+  { "id": "construction", "name": "Construction", "era": 1, "cost": 200, "prerequisites": ["masonry", "wheel"],
+    "boost_text": "Build a Water Mill.", "boost": { "type": "BUILD_BUILDING", "args": { "building": "water_mill" } },
+    "unlocks": [] },
+
+  { "id": "engineering", "name": "Engineering", "era": 1, "cost": 200, "prerequisites": ["masonry"],
+    "boost_text": "Build 2 Ancient Walls.", "boost": { "type": "BUILD_BUILDING", "args": { "building": "ancient_walls", "count": 2 } },
+    "unlocks": ["aqueduct"] },
+
+  { "id": "military_engineering", "name": "Military Engineering", "era": 2, "cost": 300, "prerequisites": ["construction"],
+    "boost_text": "Build an Aqueduct.", "boost": { "type": "BUILD_DISTRICT", "args": { "district": "aqueduct" } },
+    "unlocks": ["armory", "pikeman"] },
+
+  { "id": "apprenticeship", "name": "Apprenticeship", "era": 2, "cost": 300, "prerequisites": ["currency", "iron_working"],
+    "boost_text": "Build 3 mines.", "boost": { "type": "BUILD_IMPROVEMENT", "args": { "improvement": "mine", "count": 3 } },
+    "unlocks": ["industrial_zone", "workshop"] },
+
+  { "id": "education", "name": "Education", "era": 2, "cost": 335, "prerequisites": ["mathematics"],
+    "boost_text": "Earn a Great Scientist.", "boost": { "type": "EARN_GREAT_PERSON", "args": { "category": "scientist" } },
+    "unlocks": ["university"] },
+
+  { "id": "machinery", "name": "Machinery", "era": 2, "cost": 275, "prerequisites": ["iron_working"],
+    "boost_text": "Own 3 Archers.", "boost": { "type": "OWN_UNITS", "args": { "unit": "archer", "count": 3 } },
+    "unlocks": ["crossbowman"] },
+
+  { "id": "banking", "name": "Banking", "era": 3, "cost": 540, "prerequisites": ["education"],
+    "boost_text": "Build 2 Markets.", "boost": { "type": "BUILD_BUILDING", "args": { "building": "market", "count": 2 } },
+    "unlocks": ["bank"] },
+
+  { "id": "natural_history", "name": "Natural History", "era": 3, "cost": 540, "prerequisites": ["education"],
+    "boost_text": "Build an Entertainment Complex.", "boost": { "type": "BUILD_DISTRICT", "args": { "district": "entertainment_complex" } },
+    "unlocks": ["zoo"] },
+
+  { "id": "industrialization", "name": "Industrialization", "era": 4, "cost": 810, "prerequisites": ["apprenticeship", "banking"],
+    "boost_text": "Build 3 Workshops.", "boost": { "type": "BUILD_BUILDING", "args": { "building": "workshop", "count": 3 } },
+    "unlocks": ["factory", "musketman"] }
+]

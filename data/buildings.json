@@ -1,0 +1,299 @@
+[
+  {
+    "id": "palace",
+    "name": "Palace",
+    "description": "The seat of government. Granted free in the capital.",
+    "district": "city_center",
+    "cost": 0,
+    "maintenance": 0,
+    "yields": { "production": 2, "gold": 3, "science": 2, "culture": 1 },
+    "defense": 5
+  },
+  {
+    "id": "monument",
+    "name": "Monument",
+    "description": "A marker of permanence. The cheapest reliable Culture in the game.",
+    "district": "city_center",
+    "cost": 60,
+    "maintenance": 1,
+    "yields": { "culture": 2 }
+  },
+  {
+    "id": "granary",
+    "name": "Granary",
+    "description": "Stored surplus against a bad year. Adds Housing as well as Food.",
+    "district": "city_center",
+    "required_tech": "pottery",
+    "cost": 65,
+    "maintenance": 1,
+    "yields": { "food": 1 },
+    "housing": 2
+  },
+  {
+    "id": "water_mill",
+    "name": "Water Mill",
+    "description": "Grinds grain by river power. Requires the city to sit on fresh water.",
+    "district": "city_center",
+    "required_tech": "wheel",
+    "cost": 80,
+    "maintenance": 1,
+    "yields": { "food": 1, "production": 1 }
+  },
+  {
+    "id": "ancient_walls",
+    "name": "Ancient Walls",
+    "description": "Stone ramparts. Give the city a ranged strike and a wall HP pool that must be broken before the centre can be touched.",
+    "district": "city_center",
+    "required_tech": "masonry",
+    "cost": 80,
+    "maintenance": 0,
+    "defense": 50
+  },
+
+  {
+    "id": "library",
+    "name": "Library",
+    "description": "Scrolls, tablets and the people who read them.",
+    "district": "campus",
+    "required_tech": "writing",
+    "cost": 90,
+    "maintenance": 1,
+    "yields": { "science": 2 },
+    "citizen_slots": 1,
+    "great_person_points": { "scientist": 1 }
+  },
+  {
+    "id": "university",
+    "name": "University",
+    "description": "A permanent institution of learning.",
+    "district": "campus",
+    "required_tech": "education",
+    "required_building": "library",
+    "cost": 250,
+    "maintenance": 2,
+    "yields": { "science": 4 },
+    "citizen_slots": 1,
+    "housing": 1,
+    "great_person_points": { "scientist": 1 }
+  },
+  {
+    "id": "shrine",
+    "name": "Shrine",
+    "description": "The first dedicated place of worship. Generates the Faith that founds a pantheon.",
+    "district": "holy_site",
+    "required_tech": "astrology",
+    "cost": 70,
+    "maintenance": 1,
+    "yields": { "faith": 2 },
+    "citizen_slots": 1,
+    "great_person_points": { "prophet": 1 }
+  },
+  {
+    "id": "temple",
+    "name": "Temple",
+    "description": "A larger sanctuary, and the prerequisite for founding a religion of your own.",
+    "district": "holy_site",
+    "required_tech": "astrology",
+    "required_building": "shrine",
+    "cost": 120,
+    "maintenance": 2,
+    "yields": { "faith": 4 },
+    "citizen_slots": 1,
+    "great_person_points": { "prophet": 1 }
+  },
+  {
+    "id": "market",
+    "name": "Market",
+    "description": "Regulated trade. Adds a Trade Route capacity as well as Gold.",
+    "district": "commercial_hub",
+    "required_tech": "currency",
+    "cost": 120,
+    "maintenance": 0,
+    "yields": { "gold": 3 },
+    "citizen_slots": 1,
+    "great_person_points": { "merchant": 1 },
+    "modifiers": [
+      {
+        "id": "market_trade_capacity",
+        "effect": "ADJUST_TRADE_CAPACITY",
+        "scope": "player",
+        "args": { "amount": 1 },
+        "description": "+1 Trade Route capacity."
+      }
+    ]
+  },
+  {
+    "id": "bank",
+    "name": "Bank",
+    "description": "Credit, deposits and the machinery of finance.",
+    "district": "commercial_hub",
+    "required_tech": "banking",
+    "required_building": "market",
+    "cost": 220,
+    "maintenance": 0,
+    "yields": { "gold": 5 },
+    "citizen_slots": 1,
+    "great_person_points": { "merchant": 1 }
+  },
+  {
+    "id": "lighthouse",
+    "name": "Lighthouse",
+    "description": "Guides shipping in. Adds Food, Housing and a Trade Route capacity.",
+    "district": "harbor",
+    "required_tech": "celestial_navigation",
+    "cost": 120,
+    "maintenance": 0,
+    "yields": { "food": 1, "gold": 1 },
+    "housing": 1,
+    "citizen_slots": 1,
+    "great_person_points": { "admiral": 1 },
+    "modifiers": [
+      {
+        "id": "lighthouse_trade_capacity",
+        "effect": "ADJUST_TRADE_CAPACITY",
+        "scope": "player",
+        "args": { "amount": 1 },
+        "description": "+1 Trade Route capacity."
+      }
+    ]
+  },
+  {
+    "id": "shipyard",
+    "name": "Shipyard",
+    "description": "Builds and repairs warships.",
+    "district": "harbor",
+    "required_tech": "mathematics",
+    "required_building": "lighthouse",
+    "cost": 190,
+    "maintenance": 2,
+    "yields": { "production": 2 },
+    "citizen_slots": 1,
+    "great_person_points": { "admiral": 1 }
+  },
+  {
+    "id": "amphitheater",
+    "name": "Amphitheater",
+    "description": "Public performance space, and the first home for Great Works of writing.",
+    "district": "theater_square",
+    "required_civic": "drama_and_poetry",
+    "cost": 150,
+    "maintenance": 1,
+    "yields": { "culture": 3 },
+    "citizen_slots": 1,
+    "great_person_points": { "writer": 1 }
+  },
+  {
+    "id": "archive",
+    "name": "Archive",
+    "description": "Keeps the record. Culture compounds where it is written down.",
+    "district": "theater_square",
+    "required_tech": "writing",
+    "required_building": "amphitheater",
+    "cost": 190,
+    "maintenance": 2,
+    "yields": { "culture": 2, "science": 1 },
+    "citizen_slots": 1
+  },
+  {
+    "id": "barracks",
+    "name": "Barracks",
+    "description": "Housing and drill for a standing army. Land units train with combat experience already earned.",
+    "district": "encampment",
+    "required_tech": "bronze_working",
+    "cost": 90,
+    "maintenance": 1,
+    "yields": { "production": 1 },
+    "housing": 1,
+    "citizen_slots": 1,
+    "great_person_points": { "general": 1 },
+    "modifiers": [
+      {
+        "id": "barracks_experience",
+        "effect": "ADJUST_UNIT_EXPERIENCE_PERCENT",
+        "scope": "unit",
+        "args": { "amount": 25 },
+        "description": "+25% combat experience for land units trained here."
+      }
+    ]
+  },
+  {
+    "id": "armory",
+    "name": "Armory",
+    "description": "Workshops turning out weapons and armour at scale.",
+    "district": "encampment",
+    "required_tech": "military_engineering",
+    "required_building": "barracks",
+    "cost": 195,
+    "maintenance": 3,
+    "yields": { "production": 2 },
+    "citizen_slots": 1,
+    "great_person_points": { "general": 1 }
+  },
+  {
+    "id": "workshop",
+    "name": "Workshop",
+    "description": "Organised craft production.",
+    "district": "industrial_zone",
+    "required_tech": "apprenticeship",
+    "cost": 195,
+    "maintenance": 1,
+    "yields": { "production": 2 },
+    "citizen_slots": 1,
+    "great_person_points": { "engineer": 1 }
+  },
+  {
+    "id": "factory",
+    "name": "Factory",
+    "description": "Mechanised production, shared with every city in range.",
+    "district": "industrial_zone",
+    "required_tech": "industrialization",
+    "required_building": "workshop",
+    "cost": 330,
+    "maintenance": 3,
+    "yields": { "production": 3 },
+    "citizen_slots": 1,
+    "great_person_points": { "engineer": 1 }
+  },
+  {
+    "id": "arena",
+    "name": "Arena",
+    "description": "Games and spectacle. Buys contentment across the nearby cities.",
+    "district": "entertainment_complex",
+    "required_civic": "games_and_recreation",
+    "cost": 150,
+    "maintenance": 1,
+    "yields": { "culture": 1 },
+    "amenities": 1
+  },
+  {
+    "id": "zoo",
+    "name": "Zoo",
+    "description": "A menagerie of the world's creatures, and a claim to have seen it.",
+    "district": "entertainment_complex",
+    "required_tech": "natural_history",
+    "required_building": "arena",
+    "cost": 260,
+    "maintenance": 2,
+    "yields": { "science": 1 },
+    "amenities": 1
+  },
+  {
+    "id": "ancestral_hall",
+    "name": "Ancestral Hall",
+    "description": "Binds new cities to the old. Every city founded from here starts with a free Builder.",
+    "district": "government_plaza",
+    "required_civic": "political_philosophy",
+    "cost": 150,
+    "maintenance": 1,
+    "yields": { "production": 1 },
+    "modifiers": [
+      {
+        "id": "ancestral_hall_loyalty",
+        "effect": "ADJUST_CITY_LOYALTY_PER_TURN",
+        "scope": "city",
+        "args": { "amount": 3 },
+        "description": "+3 Loyalty per turn in all cities."
+      }
+    ]
+  }
+]

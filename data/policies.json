@@ -1,0 +1,113 @@
+[
+  { "id": "discipline", "name": "Discipline", "kind": "military", "required_civic": "code_of_laws",
+    "description": "+5 Combat Strength when fighting Barbarians.",
+    "modifiers": [{ "id": "m_discipline", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "unit", "args": { "amount": 5 },
+      "requirements": [{ "type": "OPPONENT_IS_BARBARIAN", "args": {} }] }] },
+
+  { "id": "survey", "name": "Survey", "kind": "military", "required_civic": "code_of_laws",
+    "description": "Double experience for Recon units.",
+    "modifiers": [{ "id": "m_survey", "effect": "ADJUST_UNIT_EXPERIENCE_PERCENT", "scope": "unit", "args": { "amount": 100 },
+      "requirements": [{ "type": "UNIT_CLASS_IS", "args": { "unit_class": ["recon"] } }] }] },
+
+  { "id": "god_king", "name": "God King", "kind": "economic", "required_civic": "code_of_laws",
+    "description": "+1 Faith and +1 Gold in the Capital.",
+    "modifiers": [{ "id": "m_god_king", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city", "args": { "yields": { "faith": 1, "gold": 1 } },
+      "requirements": [{ "type": "CITY_IS_CAPITAL", "args": {} }] }] },
+
+  { "id": "urban_planning", "name": "Urban Planning", "kind": "economic", "required_civic": "code_of_laws",
+    "description": "+1 Production in all cities.",
+    "modifiers": [{ "id": "m_urban_planning", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city", "args": { "yields": { "production": 1 } } }] },
+
+  { "id": "ilkum", "name": "Ilkum", "kind": "economic", "required_civic": "craftsmanship",
+    "description": "+30% Production toward Builders.",
+    "modifiers": [{ "id": "m_ilkum", "effect": "ADJUST_PRODUCTION_PERCENT", "scope": "city", "args": { "amount": 30 },
+      "requirements": [{ "type": "PRODUCTION_ITEM_IS", "args": { "item": ["builder"] } }] }] },
+
+  { "id": "agoge", "name": "Agoge", "kind": "military", "required_civic": "craftsmanship",
+    "description": "+50% Production toward Melee, Ranged and Anti-Cavalry units.",
+    "modifiers": [{ "id": "m_agoge", "effect": "ADJUST_PRODUCTION_PERCENT", "scope": "city", "args": { "amount": 50 },
+      "requirements": [{ "type": "PRODUCTION_ITEM_IS", "args": { "item": ["warrior", "spearman", "archer", "slinger", "swordsman", "pikeman"] } }] }] },
+
+  { "id": "caravansaries", "name": "Caravansaries", "kind": "economic", "required_civic": "foreign_trade",
+    "description": "+2 Gold from all Trade Routes.",
+    "modifiers": [{ "id": "m_caravansaries", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city", "args": { "yields": { "gold": 2 } },
+      "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "commercial_hub" } }] }] },
+
+  { "id": "maneuver", "name": "Maneuver", "kind": "military", "required_civic": "military_tradition",
+    "description": "+50% Production toward Cavalry units.",
+    "modifiers": [{ "id": "m_maneuver", "effect": "ADJUST_PRODUCTION_PERCENT", "scope": "city", "args": { "amount": 50 },
+      "requirements": [{ "type": "PRODUCTION_ITEM_IS", "args": { "item": ["horseman", "heavy_chariot"] } }] }] },
+
+  { "id": "raid", "name": "Raid", "kind": "military", "required_civic": "military_tradition",
+    "description": "+2 Gold in every city while at war.",
+    "modifiers": [{ "id": "m_raid", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city", "args": { "yields": { "gold": 2 } },
+      "requirements": [{ "type": "PLAYER_AT_WAR", "args": {} }] }] },
+
+  { "id": "conscription", "name": "Conscription", "kind": "military", "required_civic": "state_workforce",
+    "description": "Unit maintenance reduced by 1 Gold per unit.",
+    "modifiers": [{ "id": "m_conscription", "effect": "ADJUST_UNIT_MAINTENANCE", "scope": "player", "args": { "amount": -1 } }] },
+
+  { "id": "corvee", "name": "Corvée", "kind": "economic", "required_civic": "state_workforce",
+    "description": "+15% Production toward Districts.",
+    "modifiers": [{ "id": "m_corvee", "effect": "ADJUST_PRODUCTION_PERCENT", "scope": "city", "args": { "amount": 15 },
+      "requirements": [{ "type": "PRODUCTION_KIND_IS", "args": { "kind": ["district"] } }] }] },
+
+  { "id": "colonization", "name": "Colonization", "kind": "economic", "required_civic": "early_empire",
+    "description": "+50% Production toward Settlers.",
+    "modifiers": [{ "id": "m_colonization", "effect": "ADJUST_PRODUCTION_PERCENT", "scope": "city", "args": { "amount": 50 },
+      "requirements": [{ "type": "PRODUCTION_ITEM_IS", "args": { "item": ["settler"] } }] }] },
+
+  { "id": "land_surveyors", "name": "Land Surveyors", "kind": "economic", "required_civic": "early_empire",
+    "description": "+1 Production in all cities.",
+    "modifiers": [{ "id": "m_land_surveyors", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city", "args": { "yields": { "production": 1 } } }] },
+
+  { "id": "revelation", "name": "Revelation", "kind": "wildcard", "required_civic": "mysticism",
+    "description": "+2 Great Prophet points per turn.",
+    "modifiers": [{ "id": "m_revelation", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city", "args": { "yields": { "faith": 1 } },
+      "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "holy_site" } }] }] },
+
+  { "id": "charismatic_leader", "name": "Charismatic Leader", "kind": "diplomatic", "required_civic": "political_philosophy",
+    "description": "+2 Influence per turn toward Envoys.",
+    "modifiers": [{ "id": "m_charismatic", "effect": "ADJUST_INFLUENCE_PER_TURN", "scope": "player", "args": { "amount": 2 } }] },
+
+  { "id": "diplomatic_league", "name": "Diplomatic League", "kind": "diplomatic", "required_civic": "political_philosophy",
+    "description": "+1 Influence per turn toward Envoys.",
+    "modifiers": [{ "id": "m_dip_league", "effect": "ADJUST_INFLUENCE_PER_TURN", "scope": "player", "args": { "amount": 1 } }] },
+
+  { "id": "literary_tradition", "name": "Literary Tradition", "kind": "wildcard", "required_civic": "drama_and_poetry",
+    "description": "+2 Culture in cities with a Theater Square.",
+    "modifiers": [{ "id": "m_literary", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city", "args": { "yields": { "culture": 2 } },
+      "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "theater_square" } }] }] },
+
+  { "id": "insulae", "name": "Insulae", "kind": "economic", "required_civic": "games_and_recreation",
+    "description": "+1 Housing in cities with at least 2 specialty districts.",
+    "modifiers": [{ "id": "m_insulae", "effect": "ADJUST_CITY_HOUSING", "scope": "city", "args": { "amount": 1 },
+      "requirements": [{ "type": "CITY_POPULATION_AT_LEAST", "args": { "population": 4 } }] }] },
+
+  { "id": "natural_philosophy", "name": "Natural Philosophy", "kind": "economic", "required_civic": "recorded_history",
+    "description": "+100% Campus district adjacency bonuses.",
+    "modifiers": [{ "id": "m_nat_phil", "effect": "ADJUST_DISTRICT_ADJACENCY", "scope": "district", "args": { "amount": 2 },
+      "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "campus" } }] }] },
+
+  { "id": "bastions", "name": "Bastions", "kind": "military", "required_civic": "defensive_tactics",
+    "description": "+6 City Combat Strength.",
+    "modifiers": [{ "id": "m_bastions", "effect": "ADJUST_UNIT_COMBAT_STRENGTH", "scope": "city", "args": { "amount": 6 } }] },
+
+  { "id": "limitanei", "name": "Limitanei", "kind": "military", "required_civic": "defensive_tactics",
+    "description": "+2 Loyalty per turn in cities with a garrisoned unit.",
+    "modifiers": [{ "id": "m_limitanei", "effect": "ADJUST_CITY_LOYALTY_PER_TURN", "scope": "city", "args": { "amount": 2 } }] },
+
+  { "id": "scripture", "name": "Scripture", "kind": "wildcard", "required_civic": "theology",
+    "description": "+2 Faith in cities with a Holy Site.",
+    "modifiers": [{ "id": "m_scripture", "effect": "ADJUST_CITY_YIELD_FLAT", "scope": "city", "args": { "yields": { "faith": 2 } },
+      "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "holy_site" } }] }] },
+
+  { "id": "retainers", "name": "Retainers", "kind": "military", "required_civic": "divine_right",
+    "description": "+1 Amenity in cities with a garrisoned unit.",
+    "modifiers": [{ "id": "m_retainers", "effect": "ADJUST_CITY_AMENITIES", "scope": "city", "args": { "amount": 1 } }] },
+
+  { "id": "craftsmen_guilds", "name": "Craftsmen's Guilds", "kind": "economic", "required_civic": "guilds",
+    "description": "+15% Production in cities with an Industrial Zone.",
+    "modifiers": [{ "id": "m_craft_guilds", "effect": "ADJUST_CITY_YIELD_PERCENT", "scope": "city", "args": { "percent": { "production": 15 } },
+      "requirements": [{ "type": "CITY_HAS_DISTRICT", "args": { "district": "industrial_zone" } }] }] }
+]

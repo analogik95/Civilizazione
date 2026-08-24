@@ -1,0 +1,70 @@
+[
+  { "id": "code_of_laws", "name": "Code of Laws", "era": 0, "cost": 20, "prerequisites": [],
+    "policies": ["discipline", "survey", "god_king", "urban_planning"],
+    "unlocks": [] },
+
+  { "id": "craftsmanship", "name": "Craftsmanship", "era": 0, "cost": 40, "prerequisites": ["code_of_laws"],
+    "boost_text": "Improve 3 tiles.", "boost": { "type": "BUILD_IMPROVEMENT", "args": { "count": 3 } },
+    "policies": ["ilkum", "agoge"] },
+
+  { "id": "foreign_trade", "name": "Foreign Trade", "era": 0, "cost": 40, "prerequisites": ["code_of_laws"],
+    "boost_text": "Discover a second continent.", "boost": { "type": "DISCOVER_CONTINENT", "args": { "count": 2 } },
+    "policies": ["caravansaries"],
+    "unlocks": ["trader"] },
+
+  { "id": "military_tradition", "name": "Military Tradition", "era": 0, "cost": 50, "prerequisites": ["craftsmanship"],
+    "boost_text": "Clear a Barbarian Outpost.", "boost": { "type": "CLEAR_BARBARIAN_OUTPOST", "args": {} },
+    "policies": ["maneuver", "raid"] },
+
+  { "id": "state_workforce", "name": "State Workforce", "era": 0, "cost": 70, "prerequisites": ["craftsmanship"],
+    "boost_text": "Build any specialty district.", "boost": { "type": "BUILD_DISTRICT", "args": { "count": 1 } },
+    "policies": ["conscription", "corvee"],
+    "governor_titles": 1 },
+
+  { "id": "early_empire", "name": "Early Empire", "era": 0, "cost": 70, "prerequisites": ["foreign_trade"],
+    "boost_text": "Grow your civilization to at least 6 population.", "boost": { "type": "TOTAL_POPULATION", "args": { "count": 6 } },
+    "policies": ["colonization", "land_surveyors"],
+    "envoys": 1 },
+
+  { "id": "mysticism", "name": "Mysticism", "era": 0, "cost": 50, "prerequisites": ["foreign_trade"],
+    "boost_text": "Found a Pantheon.", "boost": { "type": "FOUND_PANTHEON", "args": {} },
+    "policies": ["revelation"] },
+
+  { "id": "political_philosophy", "name": "Political Philosophy", "era": 1, "cost": 110, "prerequisites": ["state_workforce", "early_empire"],
+    "boost_text": "Meet 3 city-states.", "boost": { "type": "MEET_CITY_STATES", "args": { "count": 3 } },
+    "policies": ["charismatic_leader", "diplomatic_league"],
+    "unlocks": ["government_plaza", "ancestral_hall"],
+    "governor_titles": 1 },
+
+  { "id": "drama_and_poetry", "name": "Drama and Poetry", "era": 1, "cost": 110, "prerequisites": ["early_empire"],
+    "boost_text": "Build a Wonder.", "boost": { "type": "BUILD_WONDER", "args": { "count": 1 } },
+    "policies": ["literary_tradition"],
+    "unlocks": ["theater_square", "amphitheater"] },
+
+  { "id": "games_and_recreation", "name": "Games and Recreation", "era": 1, "cost": 110, "prerequisites": ["state_workforce"],
+    "boost_text": "Research the Construction technology.", "boost": { "type": "HAVE_TECH", "args": { "tech": "construction" } },
+    "policies": ["insulae"],
+    "unlocks": ["entertainment_complex", "arena"] },
+
+  { "id": "recorded_history", "name": "Recorded History", "era": 1, "cost": 175, "prerequisites": ["drama_and_poetry", "political_philosophy"],
+    "boost_text": "Build 2 Campuses.", "boost": { "type": "BUILD_DISTRICT", "args": { "district": "campus", "count": 2 } },
+    "policies": ["natural_philosophy"],
+    "governor_titles": 1 },
+
+  { "id": "defensive_tactics", "name": "Defensive Tactics", "era": 1, "cost": 175, "prerequisites": ["games_and_recreation", "political_philosophy"],
+    "boost_text": "Be at war with a civilization that has more military strength.", "boost": { "type": "AT_WAR_WITH_STRONGER", "args": {} },
+    "policies": ["bastions", "limitanei"] },
+
+  { "id": "theology", "name": "Theology", "era": 2, "cost": 275, "prerequisites": ["mysticism", "drama_and_poetry"],
+    "boost_text": "Found a religion.", "boost": { "type": "FOUND_RELIGION", "args": {} },
+    "policies": ["scripture"] },
+
+  { "id": "divine_right", "name": "Divine Right", "era": 2, "cost": 410, "prerequisites": ["theology", "defensive_tactics"],
+    "boost_text": "Build 2 Temples.", "boost": { "type": "BUILD_BUILDING", "args": { "building": "temple", "count": 2 } },
+    "policies": ["retainers"],
+    "governor_titles": 1 },
+
+  { "id": "guilds", "name": "Guilds", "era": 2, "cost": 385, "prerequisites": ["recorded_history", "defensive_tactics"],
+    "boost_text": "Build 2 Markets.", "boost": { "type": "BUILD_BUILDING", "args": { "building": "market", "count": 2 } },
+    "policies": ["craftsmen_guilds"] }
+]
